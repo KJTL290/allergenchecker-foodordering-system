@@ -121,7 +121,7 @@ if ($action == 'add_custom_allergy') {
     }
 }
 
-// Update (The Fix!)
+// Update (The Logic to Prevent Duplication)
 if ($action == 'update_custom_allergy') {
     if (!isset($_SESSION['user_id'])) exit;
     $id = $input['id'];

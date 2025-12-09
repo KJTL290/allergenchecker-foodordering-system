@@ -27,7 +27,7 @@
         .btn-danger { background: white; border: 1px solid #c62828; color: #c62828; margin-top: 30px; font-size: 0.8rem; }
         .link { text-align: center; color: #c62828; cursor: pointer; font-size: 0.9rem; margin-top: 10px; display: block; }
 
-        /* GRID SYSTEM (UNIFIED) */
+        /* UNIFIED GRID SYSTEM */
         .section-label { font-weight: 700; color: #555; font-size: 0.9rem; margin-bottom: 5px; display: block; }
         .allergen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         
@@ -38,9 +38,9 @@
         }
         .allergen-btn.active { background: #ffebee; border-color: #c62828; color: #c62828; }
         
-        /* Custom are always active (Blue tint to distinguish) */
+        /* Custom buttons now look exactly like active common ones */
         .allergen-btn.custom-active { 
-            background: #e3f2fd; border-color: #2196f3; color: #1565c0; cursor: default;
+            background: #ffebee; border-color: #c62828; color: #c62828; cursor: default;
         }
 
         /* EDITOR LIST */
@@ -53,6 +53,7 @@
         /* MODAL */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 200; }
         .modal { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 350px; text-align: center; }
+        
         .chip-input-group { display: flex; gap: 5px; margin-bottom: 10px; }
         .chip-input-group input { margin: 0; }
         .btn-add-chip { width: auto; margin: 0; background: #333; color: white; border-radius: 8px; border:none; cursor: pointer; font-weight: bold; padding: 0 15px;}
@@ -140,7 +141,10 @@
     <div class="modal-overlay" id="editorModal">
         <div class="modal">
             <h3 id="modalHeader">Custom Allergy</h3>
-            <input type="hidden" id="edit_id"> <input type="text" id="c_name" placeholder="Category Name (e.g. Nightshades)">
+            
+            <input type="hidden" id="edit_id">
+            
+            <input type="text" id="c_name" placeholder="Category Name (e.g. Nightshades)">
             
             <div class="chip-input-group">
                 <input type="text" id="c_word" placeholder="Ingredient (e.g. Tomato)">
@@ -180,7 +184,8 @@
         function deleteAccount() { if(confirm("Are you sure?")) fetch('api.php?action=delete_account').then(() => location.reload()); }
 
         // --- DATA & UI ---
-        async function loadProfile() {
+        // NEW: loadProfile now accepts a 'targetView' argument
+        async function loadProfile(targetView = null) {
             const resCommon = await fetch('api.php?action=get_common_allergens');
             commonAllergens = await resCommon.json();
             
@@ -200,8 +205,14 @@
                     updateEditorList();
                     updateUI();
                     
-                    if(d.allergies.length > 0 || d.custom_allergies.length > 0) renderPass();
-                    else switchView('dashboard');
+                    // Logic to decide where to go
+                    if (targetView) {
+                        switchView(targetView);
+                    } else {
+                        // Default behavior (e.g. Login) -> Go to Pass if exists, else Dashboard
+                        if(d.allergies.length > 0 || d.custom_allergies.length > 0) renderPass();
+                        else switchView('dashboard');
+                    }
                 }
             });
         }
@@ -263,14 +274,14 @@
             document.getElementById('c_word').value = '';
             
             if(editId) {
-                const item = customAllergens.find(c => c.id === editId);
+                const item = customAllergens.find(c => c.id == editId);
                 document.getElementById('modalHeader').innerText = "Edit Category";
                 document.getElementById('edit_id').value = item.id;
                 document.getElementById('c_name').value = item.name;
                 tempKeywords = [...item.keywords];
             } else {
                 document.getElementById('modalHeader').innerText = "New Category";
-                document.getElementById('edit_id').value = ''; // Ensure ID is empty for create
+                document.getElementById('edit_id').value = "";
                 document.getElementById('c_name').value = '';
                 tempKeywords = [];
             }
@@ -295,26 +306,33 @@
         }
 
         function submitCustomAllergy() {
-            const id = document.getElementById('edit_id').value;
+            const idVal = document.getElementById('edit_id').value;
             const name = document.getElementById('c_name').value;
             
             if(!name || tempKeywords.length === 0) return alert("Please add name and ingredients");
 
-            const action = id ? 'update_custom_allergy' : 'add_custom_allergy';
+            const action = (idVal && idVal !== "") ? 'update_custom_allergy' : 'add_custom_allergy';
             const body = { name: name, keywords: tempKeywords };
-            if(id) body.id = id;
+            if(idVal) body.id = idVal;
 
             fetch('api.php?action='+action, { method: 'POST', body: JSON.stringify(body) })
-            .then(() => { closeModal(); loadProfile(); });
+            .then(() => { 
+                closeModal(); 
+                // NEW: Explicitly say "Stay on Editor"
+                loadProfile('editor'); 
+            });
         }
 
         function deleteCustom(id) {
             if(!confirm("Delete this?")) return;
             fetch('api.php?action=delete_custom_allergy', { method: 'POST', body: JSON.stringify({id: id}) })
-            .then(() => loadProfile());
+            .then(() => {
+                // NEW: Explicitly say "Stay on Editor"
+                loadProfile('editor');
+            });
         }
 
-        // --- QR RENDER (FIXED) ---
+        // --- QR RENDER ---
         function renderPass() {
             switchView('pass');
             document.getElementById('passName').innerText = currentUser.name;
@@ -332,7 +350,6 @@
                 custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords}))
             };
 
-            // Delay ensures visibility before rendering
             setTimeout(() => {
                 new QRCode(qrContainer, {
                     text: JSON.stringify(qrData),
