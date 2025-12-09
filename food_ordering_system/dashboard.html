@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visual Admin Dashboard</title>
     <style>
-        /* ... (Your CSS) ... */
+        /* ... (Keep your existing CSS exactly as is) ... */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: #f0f2f5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         .navbar { background-color: #333; color: white; height: 60px; display: flex; align-items: center; padding: 0 15px; flex-shrink: 0; gap: 10px; z-index: 100; }
@@ -51,8 +51,7 @@
         .mm-title { font-weight: 600; font-size: 1rem; color: #333; }
         .mm-price { color: #d32f2f; font-weight: 700; }
         .mm-add-card { border: 3px dashed #ddd; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 200px; }
-        .mm-add-card:hover { border-color: #4caf50; background: #f0fdf4; }
-        .plus-icon { font-size: 4rem; color: #ddd; } .mm-add-card:hover .plus-icon { color: #4caf50; }
+        .plus-icon { font-size: 4rem; color: #ddd; }
         #view-users { display: none; flex-direction: column; gap: 15px; }
         .menu-toolbar { display: flex; justify-content: flex-end; }
         .btn-add { background-color: #4caf50; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
@@ -148,8 +147,25 @@
     </div>
 
     <div class="modal-overlay" id="productModal">
-        <div class="modal"><h2 id="modalTitle">Add Product</h2><input type="hidden" id="p_id"><div style="text-align:center; margin-bottom:15px;"><img id="p_preview" src="" style="width:100px; height:100px; object-fit:cover; background:#eee; border-radius:8px; display:none;"></div><div class="form-group"><label>Image</label><input type="file" id="p_image" class="form-control" accept="image/*" onchange="previewImage(this)"></div><div class="form-group"><label>Name</label><input type="text" id="p_name" class="form-control"></div><div class="form-group"><label>Category</label><select id="p_category" class="form-control"></select></div><div class="form-group" style="display:flex; gap:10px;"><div style="flex:1;"><label>Price</label><input type="number" id="p_price" class="form-control"></div><div style="flex:1;"><label>Status</label><select id="p_status" class="form-control"><option value="1">Available</option><option value="0">Out of Stock</option></select></div></div><div class="modal-actions"><button class="btn-close" style="background:#f44336; float:left; margin-right:auto;" onclick="deleteProductFromModal()">Delete</button><button class="btn-close" onclick="closeModal()">Cancel</button><button class="btn-save" onclick="saveProduct()">Save</button></div></div>
+        <div class="modal">
+            <h2 id="modalTitle">Add Product</h2>
+            <input type="hidden" id="p_id">
+            <div style="text-align:center; margin-bottom:15px;"><img id="p_preview" src="" style="width:100px; height:100px; object-fit:cover; background:#eee; border-radius:8px; display:none;"></div>
+            
+            <div class="form-group"><label>Image</label><input type="file" id="p_image" class="form-control" accept="image/*" onchange="previewImage(this)"></div>
+            <div class="form-group"><label>Name</label><input type="text" id="p_name" class="form-control"></div>
+            <div class="form-group"><label>Category</label><select id="p_category" class="form-control"></select></div>
+            
+            <div class="form-group">
+                <label>Ingredients (Allergens)</label>
+                <textarea id="p_ingredients" class="form-control" rows="3" placeholder="e.g. Flour, Eggs, Milk, Peanuts..."></textarea>
+            </div>
+
+            <div class="form-group" style="display:flex; gap:10px;"><div style="flex:1;"><label>Price</label><input type="number" id="p_price" class="form-control"></div><div style="flex:1;"><label>Status</label><select id="p_status" class="form-control"><option value="1">Available</option><option value="0">Out of Stock</option></select></div></div>
+            <div class="modal-actions"><button class="btn-close" style="background:#f44336; float:left; margin-right:auto;" onclick="deleteProductFromModal()">Delete</button><button class="btn-close" onclick="closeModal()">Cancel</button><button class="btn-save" onclick="saveProduct()">Save</button></div>
+        </div>
     </div>
+
     <div class="modal-overlay" id="categoryModal">
         <div class="modal" style="max-width:300px;"><h2 id="catModalTitle">Add Category</h2><input type="hidden" id="c_id"><div class="form-group"><label>Name</label><input type="text" id="c_name" class="form-control"></div><div class="form-group"><label>Icon (Emoji)</label><input type="text" id="c_icon" class="form-control" placeholder="e.g. 🍔"></div><div class="modal-actions"><button class="btn-close" style="background:#f44336; float:left; margin-right:auto;" onclick="deleteCategoryFromModal()">Delete</button><button class="btn-close" onclick="closeCatModal()">Cancel</button><button class="btn-save" onclick="saveCategory()">Save</button></div></div>
     </div>
@@ -197,10 +213,40 @@
         function addDragEvents(item, type) { item.addEventListener('dragstart', (e) => { dragSrcEl=item; item.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; }); item.addEventListener('dragover', (e) => { if(e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }); item.addEventListener('dragenter', (e) => { item.style.transform='scale(1.02)'; }); item.addEventListener('dragleave', (e) => { item.style.transform='scale(1)'; }); item.addEventListener('drop', (e) => { if(e.stopPropagation) e.stopPropagation(); if(dragSrcEl!==item) { const parent=item.parentNode; const srcIndex=[...parent.children].indexOf(dragSrcEl); const targetIndex=[...parent.children].indexOf(item); if(srcIndex<targetIndex) parent.insertBefore(dragSrcEl, item.nextSibling); else parent.insertBefore(dragSrcEl, item); saveNewOrder(parent, type); } return false; }); item.addEventListener('dragend', () => { item.classList.remove('dragging'); item.style.transform='scale(1)'; }); }
         function saveNewOrder(container, type) { const items=[]; let index=0; for(let child of container.children) { if(child.dataset.id) { items.push({ id: child.dataset.id, order: index }); index++; } } const action=type==='category'?'reorder_categories':'reorder_products'; fetch(`admin_api.php?action=${action}`, { method: 'POST', body: JSON.stringify({ items: items }) }); }
 
-        function openModal() { document.getElementById('productModal').style.display='flex'; document.getElementById('p_id').value=''; document.getElementById('p_name').value=''; document.getElementById('p_price').value=''; document.getElementById('p_preview').style.display='none'; document.getElementById('modalTitle').innerText="Add New Product"; fetchCategoriesForDropdown(); }
+        function openModal() { document.getElementById('productModal').style.display='flex'; document.getElementById('p_id').value=''; document.getElementById('p_name').value=''; document.getElementById('p_price').value=''; document.getElementById('p_ingredients').value=''; document.getElementById('p_preview').style.display='none'; document.getElementById('modalTitle').innerText="Add New Product"; fetchCategoriesForDropdown(); }
         function closeModal() { document.getElementById('productModal').style.display='none'; }
-        function editProduct(p) { openModal(); document.getElementById('modalTitle').innerText="Edit Product"; document.getElementById('p_id').value=p.id; document.getElementById('p_name').value=p.name; document.getElementById('p_price').value=p.price; document.getElementById('p_status').value=p.is_available; fetchCategoriesForDropdown().then(() => { document.getElementById('p_category').value=p.category; }); if(p.image_url) { document.getElementById('p_preview').src=p.image_url; document.getElementById('p_preview').style.display='inline-block'; } }
-        function saveProduct() { const fd=new FormData(); fd.append('id', document.getElementById('p_id').value); fd.append('name', document.getElementById('p_name').value); fd.append('category', document.getElementById('p_category').value); fd.append('price', document.getElementById('p_price').value); fd.append('is_available', document.getElementById('p_status').value); if(document.getElementById('p_image').files[0]) fd.append('image', document.getElementById('p_image').files[0]); fetch('admin_api.php?action=save', { method: 'POST', body: fd }).then(res => res.json()).then(r => { if(r.status==='success') { closeModal(); initVisualMenuManager(); } else alert('Error: '+r.message); }); }
+        
+        // UPDATED: editProduct to load ingredients
+        function editProduct(p) { 
+            openModal(); 
+            document.getElementById('modalTitle').innerText="Edit Product"; 
+            document.getElementById('p_id').value=p.id; 
+            document.getElementById('p_name').value=p.name; 
+            document.getElementById('p_price').value=p.price; 
+            document.getElementById('p_status').value=p.is_available; 
+            document.getElementById('p_ingredients').value=p.ingredients || ''; // Load ingredients or empty
+            
+            fetchCategoriesForDropdown().then(() => { document.getElementById('p_category').value=p.category; }); 
+            if(p.image_url) { document.getElementById('p_preview').src=p.image_url; document.getElementById('p_preview').style.display='inline-block'; } 
+        }
+
+        // UPDATED: saveProduct to send ingredients
+        function saveProduct() { 
+            const fd=new FormData(); 
+            fd.append('id', document.getElementById('p_id').value); 
+            fd.append('name', document.getElementById('p_name').value); 
+            fd.append('category', document.getElementById('p_category').value); 
+            fd.append('ingredients', document.getElementById('p_ingredients').value); // Send new field
+            fd.append('price', document.getElementById('p_price').value); 
+            fd.append('is_available', document.getElementById('p_status').value); 
+            
+            if(document.getElementById('p_image').files[0]) fd.append('image', document.getElementById('p_image').files[0]); 
+            
+            fetch('admin_api.php?action=save', { method: 'POST', body: fd })
+            .then(res => res.json())
+            .then(r => { if(r.status==='success') { closeModal(); initVisualMenuManager(); } else alert('Error: '+r.message); }); 
+        }
+
         function deleteProductFromModal() { const id=document.getElementById('p_id').value; if(!id) return; if(confirm("Delete item?")) { const fd=new FormData(); fd.append('id', id); fetch('admin_api.php?action=delete', { method: 'POST', body: fd }).then(() => { closeModal(); initVisualMenuManager(); }); } }
         function openCatModal() { document.getElementById('categoryModal').style.display='flex'; document.getElementById('c_id').value=''; document.getElementById('c_name').value=''; document.getElementById('c_icon').value=''; document.getElementById('catModalTitle').innerText="Add Category"; }
         function closeCatModal() { document.getElementById('categoryModal').style.display='none'; }

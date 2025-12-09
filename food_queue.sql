@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 09, 2025 at 05:11 AM
+-- Generation Time: Dec 09, 2025 at 05:30 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -131,24 +131,25 @@ CREATE TABLE `products` (
   `category` varchar(50) NOT NULL,
   `is_available` tinyint(4) DEFAULT 1,
   `image` varchar(255) DEFAULT NULL,
-  `sort_order` int(11) DEFAULT 999
+  `sort_order` int(11) DEFAULT 999,
+  `ingredients` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `products`
 --
 
-INSERT INTO `products` (`id`, `name`, `price`, `category`, `is_available`, `image`, `sort_order`) VALUES
-(1, '1pc Chicken w/ Rice', 99.00, 'Chicken', 1, NULL, 2),
-(2, '2pc Chicken w/ Rice', 150.00, 'Chicken', 1, NULL, 3),
-(3, 'Bucket of 6', 450.00, 'Chicken', 1, NULL, 1),
-(4, 'Spicy Chicken', 95.00, 'Chicken', 1, NULL, 0),
-(5, 'Regular Burger', 45.00, 'Burgers', 1, NULL, 0),
-(6, 'Cheeseburger', 40.00, 'Burgers', 1, NULL, 1),
-(7, 'Double Patty', 95.00, 'Burgers', 1, NULL, 2),
-(8, 'Spaghetti', 59.00, 'Noodles', 1, NULL, 999),
-(9, 'Coke', 29.00, 'Drinks', 1, NULL, 999),
-(11, '1 slice mango pie', 60.00, 'Desserts', 1, NULL, 999);
+INSERT INTO `products` (`id`, `name`, `price`, `category`, `is_available`, `image`, `sort_order`, `ingredients`) VALUES
+(1, '1pc Chicken w/ Rice', 99.00, 'Chicken', 1, NULL, 2, NULL),
+(2, '2pc Chicken w/ Rice', 150.00, 'Chicken', 1, NULL, 3, NULL),
+(3, 'Bucket of 6', 450.00, 'Chicken', 1, NULL, 1, NULL),
+(4, 'Spicy Chicken', 95.00, 'Chicken', 1, NULL, 0, NULL),
+(5, 'Regular Burger', 45.00, 'Burgers', 1, NULL, 0, NULL),
+(6, 'Cheeseburger', 40.00, 'Burgers', 1, NULL, 1, NULL),
+(7, 'Double Patty', 95.00, 'Burgers', 1, NULL, 2, NULL),
+(8, 'Spaghetti', 59.00, 'Noodles', 1, NULL, 999, NULL),
+(9, 'Coke', 29.00, 'Drinks', 1, NULL, 999, NULL),
+(11, '1 slice mango pie', 60.00, 'Desserts', 1, NULL, 999, NULL);
 
 -- --------------------------------------------------------
 
