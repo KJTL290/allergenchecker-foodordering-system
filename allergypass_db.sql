@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 09, 2025 at 01:40 PM
+-- Generation Time: Dec 09, 2025 at 04:37 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -83,20 +83,6 @@ CREATE TABLE `common_keywords` (
 --
 
 INSERT INTO `common_keywords` (`id`, `common_allergen_id`, `word`) VALUES
-(3, 2, 'Milk'),
-(4, 2, 'Whole Milk Powder'),
-(5, 2, 'Skim Milk Powder'),
-(6, 2, 'Cream'),
-(7, 2, 'Butter'),
-(8, 2, 'Ghee'),
-(9, 2, 'Cheese'),
-(10, 2, 'Yogurt'),
-(11, 2, 'Whey'),
-(12, 2, 'Casein'),
-(13, 2, 'Lactose'),
-(14, 2, 'Buttermilk'),
-(15, 2, 'Milkfat'),
-(16, 2, 'Curds'),
 (17, 5, 'Eggs'),
 (18, 5, 'Whole Egg'),
 (19, 5, 'Egg Whites'),
@@ -120,20 +106,6 @@ INSERT INTO `common_keywords` (`id`, `common_allergen_id`, `word`) VALUES
 (49, 8, 'Fish Sauce'),
 (50, 8, 'Worcestershire Sauce'),
 (51, 8, 'Caesar Dressing'),
-(52, 4, 'Wheat'),
-(53, 4, 'Barley'),
-(54, 4, 'Rye'),
-(55, 4, 'Triticale'),
-(56, 4, 'Wheat Flour'),
-(57, 4, 'Whole Wheat'),
-(58, 4, 'Wheat Starch'),
-(59, 4, 'Barley Malt'),
-(60, 4, 'Rye Flour'),
-(61, 4, 'Brewer\'s Yeast'),
-(62, 4, 'Modified Food Starch'),
-(63, 4, 'Soy Sauce'),
-(64, 4, 'Gravies'),
-(65, 4, 'Beer'),
 (66, 1, 'Peanuts'),
 (67, 1, 'Peanut Butter'),
 (68, 1, 'Peanut flour'),
@@ -171,17 +143,60 @@ INSERT INTO `common_keywords` (`id`, `common_allergen_id`, `word`) VALUES
 (100, 3, 'Crab Extract'),
 (101, 3, 'Lobster Extract'),
 (102, 3, 'Seafood Seasoning'),
-(103, 6, 'Soybeans'),
-(104, 6, 'Soy Flour'),
-(105, 6, 'Soy Milk'),
-(106, 6, 'Soy Protein'),
-(107, 6, 'Soy Protein Concentrate'),
-(108, 6, 'Soy Sauce'),
-(109, 6, 'Tamari'),
-(110, 6, 'Miso'),
-(111, 6, 'Tofu'),
-(112, 6, 'Tempeh'),
-(113, 6, 'Edamame');
+(185, 2, 'Milk'),
+(186, 2, 'Whole Milk Powder'),
+(187, 2, 'Skim Milk Powder'),
+(188, 2, 'Cream'),
+(189, 2, 'Butter'),
+(190, 2, 'Ghee'),
+(191, 2, 'Cheese'),
+(192, 2, 'Yogurt'),
+(193, 2, 'Whey'),
+(194, 2, 'Casein'),
+(195, 2, 'Lactose'),
+(196, 2, 'Buttermilk'),
+(197, 2, 'Milkfat'),
+(198, 2, 'Curds'),
+(199, 2, 'Cheddar Cheese'),
+(200, 2, 'Cream Cheese'),
+(201, 2, 'Heavy Cream'),
+(202, 2, 'Heavy Whipping Cream'),
+(203, 2, 'Sour Cream'),
+(204, 2, 'Whole Milk'),
+(205, 2, 'Fresh Milk'),
+(206, 2, 'Condensed Milk'),
+(207, 2, 'Evaporated Milk'),
+(208, 4, 'Wheat'),
+(209, 4, 'Barley'),
+(210, 4, 'Rye'),
+(211, 4, 'Triticale'),
+(212, 4, 'Wheat Flour'),
+(213, 4, 'Whole Wheat'),
+(214, 4, 'Wheat Starch'),
+(215, 4, 'Barley Malt'),
+(216, 4, 'Rye Flour'),
+(217, 4, 'Brewer\'s Yeast'),
+(218, 4, 'Modified Food Starch'),
+(219, 4, 'Soy Sauce'),
+(220, 4, 'Gravies'),
+(221, 4, 'Beer'),
+(222, 4, 'All-Purpose Flour'),
+(223, 4, 'Bread Flour'),
+(224, 4, 'Cake Flour'),
+(225, 4, 'Graham cracker Crumbs'),
+(226, 6, 'Soybeans'),
+(227, 6, 'Soy Flour'),
+(228, 6, 'Soy Milk'),
+(229, 6, 'Soy Protein'),
+(230, 6, 'Soy Protein Concentrate'),
+(231, 6, 'Soy Sauce'),
+(232, 6, 'Tamari'),
+(233, 6, 'Miso'),
+(234, 6, 'Tofu'),
+(235, 6, 'Tempeh'),
+(236, 6, 'Edamame'),
+(237, 6, 'Dark Chocolate'),
+(238, 6, 'Chocolate Batons');
 
 -- --------------------------------------------------------
 
@@ -322,7 +337,7 @@ ALTER TABLE `common_allergens`
 -- AUTO_INCREMENT for table `common_keywords`
 --
 ALTER TABLE `common_keywords`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=114;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=239;
 
 --
 -- AUTO_INCREMENT for table `custom_allergens`
