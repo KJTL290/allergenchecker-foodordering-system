@@ -27,39 +27,44 @@
         .btn-danger { background: white; border: 1px solid #c62828; color: #c62828; margin-top: 30px; font-size: 0.8rem; }
         .link { text-align: center; color: #c62828; cursor: pointer; font-size: 0.9rem; margin-top: 10px; display: block; }
 
-        /* DASHBOARD ELEMENTS */
+        /* GRID SYSTEM (UNIFIED) */
         .section-label { font-weight: 700; color: #555; font-size: 0.9rem; margin-bottom: 5px; display: block; }
         .allergen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .allergen-btn { background: #fafafa; border: 2px solid #eee; padding: 12px; border-radius: 10px; text-align: center; font-weight: 600; cursor: pointer; color: #777; transition: 0.1s; }
+        
+        .allergen-btn { 
+            background: #fafafa; border: 2px solid #eee; padding: 12px; border-radius: 10px; 
+            text-align: center; font-weight: 600; cursor: pointer; color: #777; transition: 0.1s; 
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
         .allergen-btn.active { background: #ffebee; border-color: #c62828; color: #c62828; }
+        
+        /* Custom are always active (Blue tint to distinguish) */
+        .allergen-btn.custom-active { 
+            background: #e3f2fd; border-color: #2196f3; color: #1565c0; cursor: default;
+        }
 
-        /* CLEAN TAGS FOR DASHBOARD */
-        .simple-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-        .simple-tag { background: #e3f2fd; color: #1565c0; padding: 6px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; }
-
-        /* EDITOR LIST ITEMS */
+        /* EDITOR LIST */
         .editor-list { display: flex; flex-direction: column; gap: 10px; }
         .editor-item { background: white; border: 1px solid #eee; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
         .editor-info div { font-weight: bold; color: #333; }
         .editor-info small { color: #888; font-size: 0.8rem; }
         .editor-actions button { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px; }
-        
-        /* QR DISPLAY */
-        .qr-container { background: white; padding: 20px; border-radius: 15px; border: 2px dashed #ddd; display: flex; flex-direction: column; align-items: center; text-align: center; }
-        #qrcode img { margin: 10px 0; border: 5px solid white; }
-        .status-badge { background: #ffebee; color: #c62828; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; display: inline-block; margin-bottom: 10px; }
 
         /* MODAL */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 200; }
         .modal { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 350px; text-align: center; }
-        
         .chip-input-group { display: flex; gap: 5px; margin-bottom: 10px; }
         .chip-input-group input { margin: 0; }
         .btn-add-chip { width: auto; margin: 0; background: #333; color: white; border-radius: 8px; border:none; cursor: pointer; font-weight: bold; padding: 0 15px;}
-        
         .chip-container { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; min-height: 30px; }
         .chip { background: #eee; padding: 4px 8px; border-radius: 15px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
         .chip span { cursor: pointer; font-weight: bold; color: #c62828; }
+
+        /* QR DISPLAY */
+        .qr-container { background: white; padding: 20px; border-radius: 15px; border: 2px dashed #ddd; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 250px; justify-content: center; }
+        #qrcode { margin: 10px 0; }
+        #qrcode img { display: block; margin: 0 auto; border: 5px solid white; }
+        .status-badge { background: #ffebee; color: #c62828; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; display: inline-block; margin-bottom: 10px; }
 
         @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
     </style>
@@ -98,10 +103,9 @@
             </div>
 
             <div>
-                <span class="section-label">Custom Restrictions</span>
-                <div class="simple-tags" id="customTagsClean">
-                    <span style="color:#999; font-size:0.9rem;">None added yet.</span>
-                </div>
+                <span class="section-label">Custom Allergies</span>
+                <div class="allergen-grid" id="customGrid">
+                    </div>
                 <button class="btn btn-outline" onclick="switchView('editor')">⚙️ Manage Custom Allergies</button>
             </div>
 
@@ -111,11 +115,10 @@
         </div>
 
         <div id="view-editor" class="body">
-            <h3>Manage Custom Allergies</h3>
-            <p style="color:#666; font-size:0.9rem; margin-top:0;">Create categories for things like Nightshades, FODMAPs, or specific fruits.</p>
+            <h3>Manage Allergies</h3>
+            <p style="color:#666; font-size:0.9rem; margin-top:0;">Add, Edit, or Remove your custom definitions.</p>
             
-            <div id="editorList" class="editor-list">
-                </div>
+            <div id="editorList" class="editor-list"></div>
 
             <button class="btn btn-primary" onclick="openModal()">+ Add New Category</button>
             <button class="btn btn-secondary" onclick="switchView('dashboard')">Back to Profile</button>
@@ -136,7 +139,7 @@
 
     <div class="modal-overlay" id="editorModal">
         <div class="modal">
-            <h3 id="modalHeader">Add Custom Allergy</h3>
+            <h3 id="modalHeader">Custom Allergy</h3>
             <input type="hidden" id="edit_id"> <input type="text" id="c_name" placeholder="Category Name (e.g. Nightshades)">
             
             <div class="chip-input-group">
@@ -147,7 +150,7 @@
             <div class="chip-container" id="chipList"></div>
             
             <button class="btn btn-primary" onclick="submitCustomAllergy()">Save Category</button>
-            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-secondary" style="margin-top:5px;" onclick="closeModal()">Cancel</button>
         </div>
     </div>
 
@@ -156,8 +159,6 @@
         let activeAllergies = new Set();
         let customAllergens = [];
         let currentUser = {};
-        
-        // Modal State
         let tempKeywords = [];
 
         // --- AUTH ---
@@ -178,12 +179,11 @@
         function logout() { fetch('api.php?action=logout').then(() => location.reload()); }
         function deleteAccount() { if(confirm("Are you sure?")) fetch('api.php?action=delete_account').then(() => location.reload()); }
 
-        // --- DATA LOADING ---
+        // --- DATA & UI ---
         async function loadProfile() {
             const resCommon = await fetch('api.php?action=get_common_allergens');
             commonAllergens = await resCommon.json();
             
-            // Render Common Buttons
             const grid = document.getElementById('commonGrid');
             grid.innerHTML = '';
             commonAllergens.forEach(alg => {
@@ -196,6 +196,8 @@
                     activeAllergies = new Set(d.allergies);
                     customAllergens = d.custom_allergies;
                     
+                    renderCustomGrid();
+                    updateEditorList();
                     updateUI();
                     
                     if(d.allergies.length > 0 || d.custom_allergies.length > 0) renderPass();
@@ -205,26 +207,31 @@
         }
 
         function updateUI() {
-            // 1. Update Buttons
             document.querySelectorAll('.allergen-btn').forEach(btn => btn.classList.remove('active'));
             activeAllergies.forEach(alg => {
                 const btn = document.getElementById('btn-' + alg);
                 if(btn) btn.classList.add('active');
             });
+        }
 
-            // 2. Update Clean Tags on Dashboard
-            const cleanDiv = document.getElementById('customTagsClean');
-            cleanDiv.innerHTML = customAllergens.length ? '' : '<span style="color:#999; font-size:0.9rem;">None added yet.</span>';
-            customAllergens.forEach(c => {
-                cleanDiv.innerHTML += `<div class="simple-tag">${c.name}</div>`;
-            });
-
-            // 3. Update Editor List
-            const editorList = document.getElementById('editorList');
-            editorList.innerHTML = customAllergens.length ? '' : '<div style="text-align:center; color:#999;">No custom categories found.</div>';
+        function renderCustomGrid() {
+            const grid = document.getElementById('customGrid');
+            grid.innerHTML = customAllergens.length ? '' : '<span style="color:#aaa; font-size:0.9rem;">None.</span>';
             
             customAllergens.forEach(c => {
-                editorList.innerHTML += `
+                grid.innerHTML += `
+                    <div class="allergen-btn custom-active">
+                        ⚠️ ${c.name}
+                    </div>`;
+            });
+        }
+
+        function updateEditorList() {
+            const list = document.getElementById('editorList');
+            list.innerHTML = customAllergens.length ? '' : '<span style="text-align:center; color:#999;">No custom categories found.</span>';
+            
+            customAllergens.forEach(c => {
+                list.innerHTML += `
                     <div class="editor-item">
                         <div class="editor-info">
                             <div>${c.name}</div>
@@ -238,36 +245,32 @@
             });
         }
 
-        // --- CORE ACTIONS ---
-        function saveProfile() {
-            const list = Array.from(activeAllergies);
-            fetch('api.php?action=save_profile', { method: 'POST', body: JSON.stringify({allergies: list}) })
-            .then(() => { currentUser.allergies = list; renderPass(); });
-        }
-
         function toggleCommon(name) {
             if (activeAllergies.has(name)) activeAllergies.delete(name);
             else activeAllergies.add(name);
             updateUI();
         }
 
+        function saveProfile() {
+            const list = Array.from(activeAllergies);
+            fetch('api.php?action=save_profile', { method: 'POST', body: JSON.stringify({allergies: list}) })
+            .then(() => { currentUser.allergies = list; renderPass(); });
+        }
+
         // --- EDITOR LOGIC ---
-        
         function openModal(editId = null) {
             document.getElementById('editorModal').style.display = 'flex';
             document.getElementById('c_word').value = '';
             
             if(editId) {
-                // EDIT MODE
                 const item = customAllergens.find(c => c.id === editId);
                 document.getElementById('modalHeader').innerText = "Edit Category";
                 document.getElementById('edit_id').value = item.id;
                 document.getElementById('c_name').value = item.name;
-                tempKeywords = [...item.keywords]; // Copy array
+                tempKeywords = [...item.keywords];
             } else {
-                // CREATE MODE
-                document.getElementById('modalHeader').innerText = "Add New Category";
-                document.getElementById('edit_id').value = '';
+                document.getElementById('modalHeader').innerText = "New Category";
+                document.getElementById('edit_id').value = ''; // Ensure ID is empty for create
                 document.getElementById('c_name').value = '';
                 tempKeywords = [];
             }
@@ -295,15 +298,14 @@
             const id = document.getElementById('edit_id').value;
             const name = document.getElementById('c_name').value;
             
-            if(!name || tempKeywords.length === 0) return alert("Add a name and ingredients");
+            if(!name || tempKeywords.length === 0) return alert("Please add name and ingredients");
 
             const action = id ? 'update_custom_allergy' : 'add_custom_allergy';
             const body = { name: name, keywords: tempKeywords };
             if(id) body.id = id;
 
-            fetch('api.php?action='+action, {
-                method: 'POST', body: JSON.stringify(body)
-            }).then(() => { closeModal(); loadProfile(); });
+            fetch('api.php?action='+action, { method: 'POST', body: JSON.stringify(body) })
+            .then(() => { closeModal(); loadProfile(); });
         }
 
         function deleteCustom(id) {
@@ -312,7 +314,7 @@
             .then(() => loadProfile());
         }
 
-        // --- QR ---
+        // --- QR RENDER (FIXED) ---
         function renderPass() {
             switchView('pass');
             document.getElementById('passName').innerText = currentUser.name;
@@ -321,16 +323,26 @@
             document.getElementById('passList').innerText = "Allergies: " + (commonStr || "None");
             document.getElementById('customPassDetails').innerText = customStr ? "Specific: " + customStr : "";
 
-            document.getElementById('qrcode').innerHTML = "";
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = "";
+            
             const qrData = {
                 name: currentUser.name,
                 allergies: currentUser.allergies,
                 custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords}))
             };
 
-            new QRCode(document.getElementById("qrcode"), {
-                text: JSON.stringify(qrData), width: 180, height: 180, colorDark : "#c62828", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.M
-            });
+            // Delay ensures visibility before rendering
+            setTimeout(() => {
+                new QRCode(qrContainer, {
+                    text: JSON.stringify(qrData),
+                    width: 180,
+                    height: 180,
+                    colorDark : "#c62828",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.M
+                });
+            }, 300);
         }
 
         function downloadQR() {
@@ -338,9 +350,9 @@
             if (img && img.src) {
                 const link = document.createElement("a");
                 link.href = img.src;
-                link.download = "AllergyPass.png";
+                link.download = "My_AllergyPass.png";
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            }
+            } else { alert("QR Code not generated yet."); }
         }
 
         function switchView(viewName) {

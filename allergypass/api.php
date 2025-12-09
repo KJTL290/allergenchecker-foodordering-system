@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents("php://input"), true);
 
-// --- AUTH (Register/Login/Logout) ---
+// --- AUTH ---
 if ($action == 'register') {
     $user = $input['username']; $pass = md5($input['password']); $name = $input['full_name'];
     $check = $conn->query("SELECT id FROM users WHERE username = '$user'");
@@ -29,33 +29,38 @@ if ($action == 'login') {
 
 if ($action == 'logout') { session_destroy(); echo json_encode(["status" => "success"]); }
 
-// --- PROFILE & STANDARD ALLERGIES ---
+if ($action == 'delete_account') {
+    if (!isset($_SESSION['user_id'])) exit;
+    $uid = $_SESSION['user_id'];
+    $conn->query("DELETE FROM users WHERE id=$uid");
+    session_destroy();
+    echo json_encode(["status" => "success"]);
+}
 
+// --- DATA FETCHING ---
 if ($action == 'get_profile') {
     if (!isset($_SESSION['user_id'])) { echo json_encode(["status" => "error"]); exit; }
     $uid = $_SESSION['user_id'];
     
-    // 1. User Info
+    // User Info
     $userRes = $conn->query("SELECT full_name FROM users WHERE id=$uid");
     $userRow = $userRes->fetch_assoc();
     
-    // 2. Saved Common Allergies
+    // Common Allergies
     $algRes = $conn->query("SELECT allergy_name FROM user_allergies WHERE user_id=$uid");
     $allergies = [];
     while($row = $algRes->fetch_assoc()) $allergies[] = $row['allergy_name'];
 
-    // 3. Custom Allergies (New!)
+    // Custom Allergies
     $custom = [];
     $custSql = "SELECT * FROM custom_allergens WHERE user_id=$uid";
     $custRes = $conn->query($custSql);
     while($row = $custRes->fetch_assoc()) {
         $cid = $row['id'];
         $row['keywords'] = [];
-        // Get keywords
         $kwSql = "SELECT word FROM custom_keywords WHERE custom_allergen_id=$cid";
         $kwRes = $conn->query($kwSql);
         while($k = $kwRes->fetch_assoc()) $row['keywords'][] = $k['word'];
-        
         $custom[] = $row;
     }
 
@@ -67,6 +72,15 @@ if ($action == 'get_profile') {
     ]);
 }
 
+if ($action == 'get_common_allergens') {
+    $sql = "SELECT name, icon FROM common_allergens ORDER BY name ASC";
+    $result = $conn->query($sql);
+    $common = [];
+    while($row = $result->fetch_assoc()) $common[] = $row;
+    echo json_encode($common);
+}
+
+// --- SAVING ---
 if ($action == 'save_profile') {
     if (!isset($_SESSION['user_id'])) { echo json_encode(["status" => "error"]); exit; }
     $uid = $_SESSION['user_id'];
@@ -83,28 +97,19 @@ if ($action == 'save_profile') {
     echo json_encode(["status" => "success"]);
 }
 
-if ($action == 'get_common_allergens') {
-    $sql = "SELECT name, icon FROM common_allergens ORDER BY name ASC";
-    $result = $conn->query($sql);
-    $common = [];
-    while($row = $result->fetch_assoc()) $common[] = $row;
-    echo json_encode($common);
-}
+// --- CUSTOM ALLERGY CRUD ---
 
-// --- CUSTOM ALLERGY CRUD (New!) ---
-
-// Create Category (e.g. "Nightshades")
+// Add
 if ($action == 'add_custom_allergy') {
     if (!isset($_SESSION['user_id'])) exit;
     $uid = $_SESSION['user_id'];
     $name = $input['name'];
-    $words = $input['keywords']; // Array of strings e.g. ["Tomato", "Potato"]
+    $words = $input['keywords'];
 
     $stmt = $conn->prepare("INSERT INTO custom_allergens (user_id, name) VALUES (?, ?)");
     $stmt->bind_param("is", $uid, $name);
     if($stmt->execute()) {
         $cid = $conn->insert_id;
-        // Add Keywords
         $kStmt = $conn->prepare("INSERT INTO custom_keywords (custom_allergen_id, word) VALUES (?, ?)");
         foreach($words as $w) {
             $kStmt->bind_param("is", $cid, $w);
@@ -116,41 +121,20 @@ if ($action == 'add_custom_allergy') {
     }
 }
 
-// Delete Category
-if ($action == 'delete_custom_allergy') {
-    if (!isset($_SESSION['user_id'])) exit;
-    $id = $input['id'];
-    $conn->query("DELETE FROM custom_allergens WHERE id=$id"); // Cascades keywords
-    echo json_encode(["status" => "success"]);
-}
-
-// Delete Account
-if ($action == 'delete_account') {
-    if (!isset($_SESSION['user_id'])) exit;
-    $uid = $_SESSION['user_id'];
-    $conn->query("DELETE FROM users WHERE id=$uid");
-    session_destroy();
-    echo json_encode(["status" => "success"]);
-}
-
-// ... (Previous code) ...
-
-// UPDATE CUSTOM ALLERGY (Edit Name & Ingredients)
+// Update (The Fix!)
 if ($action == 'update_custom_allergy') {
     if (!isset($_SESSION['user_id'])) exit;
-    
     $id = $input['id'];
     $name = $input['name'];
-    $words = $input['keywords']; // Array e.g. ["Tomato", "Potato"]
+    $words = $input['keywords'];
 
-    // 1. Update Name
     $stmt = $conn->prepare("UPDATE custom_allergens SET name=? WHERE id=?");
     $stmt->bind_param("si", $name, $id);
     
     if($stmt->execute()) {
-        // 2. Update Keywords (Simplest way: Delete old, Insert new)
+        // Delete old keywords
         $conn->query("DELETE FROM custom_keywords WHERE custom_allergen_id=$id");
-        
+        // Insert new ones
         $kStmt = $conn->prepare("INSERT INTO custom_keywords (custom_allergen_id, word) VALUES (?, ?)");
         foreach($words as $w) {
             $kStmt->bind_param("is", $id, $w);
@@ -160,5 +144,13 @@ if ($action == 'update_custom_allergy') {
     } else {
         echo json_encode(["status" => "error"]);
     }
+}
+
+// Delete
+if ($action == 'delete_custom_allergy') {
+    if (!isset($_SESSION['user_id'])) exit;
+    $id = $input['id'];
+    $conn->query("DELETE FROM custom_allergens WHERE id=$id");
+    echo json_encode(["status" => "success"]);
 }
 ?>
