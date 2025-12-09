@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 08, 2025 at 03:11 PM
+-- Generation Time: Dec 09, 2025 at 05:11 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -68,7 +68,16 @@ INSERT INTO `orders` (`id`, `total_price`, `status`, `created_at`) VALUES
 (4, 40.00, 'completed', '2025-12-08 07:25:35'),
 (5, 29.00, 'completed', '2025-12-08 07:25:39'),
 (7, 169.00, 'completed', '2025-12-08 12:25:49'),
-(8, 89.00, 'completed', '2025-12-08 13:28:00');
+(8, 89.00, 'completed', '2025-12-08 13:28:00'),
+(10, 358.00, 'completed', '2025-12-08 14:51:36'),
+(11, 624.00, 'completed', '2025-12-09 03:42:40'),
+(12, 95.00, 'completed', '2025-12-09 03:43:45'),
+(13, 95.00, 'completed', '2025-12-09 03:47:11'),
+(14, 95.00, 'completed', '2025-12-09 03:48:09'),
+(15, 95.00, 'completed', '2025-12-09 03:54:49'),
+(16, 95.00, 'completed', '2025-12-09 04:03:23'),
+(17, 95.00, 'completed', '2025-12-09 04:05:21'),
+(18, 450.00, 'completed', '2025-12-09 04:06:02');
 
 -- --------------------------------------------------------
 
@@ -96,7 +105,18 @@ INSERT INTO `order_items` (`id`, `order_id`, `product_name`, `quantity`) VALUES
 (8, 7, 'Regular Burger', 1),
 (9, 7, 'Coke', 1),
 (10, 8, '1 slice mango pie', 1),
-(11, 8, 'Coke', 1);
+(11, 8, 'Coke', 1),
+(13, 10, '2pc Chicken w/ Rice', 2),
+(14, 10, 'Coke', 2),
+(15, 11, 'Bucket of 6', 1),
+(16, 11, 'Coke', 6),
+(17, 12, 'Spicy Chicken', 1),
+(18, 13, 'Spicy Chicken', 1),
+(19, 14, 'Spicy Chicken', 1),
+(20, 15, 'Spicy Chicken', 1),
+(21, 16, 'Spicy Chicken', 1),
+(22, 17, 'Spicy Chicken', 1),
+(23, 18, 'Bucket of 6', 1);
 
 -- --------------------------------------------------------
 
@@ -202,13 +222,13 @@ ALTER TABLE `categories`
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `products`
@@ -220,7 +240,7 @@ ALTER TABLE `products`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- Constraints for dumped tables

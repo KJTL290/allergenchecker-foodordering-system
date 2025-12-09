@@ -5,19 +5,24 @@ header('Content-Type: application/json');
 
 $action = $_GET['action'] ?? '';
 
-// --- AUTH HELPERS ---
+// --- AUTH HELPERS (UPDATED TO MATCH auth.php) ---
 function isAdmin() {
+    // Check if "admin_session" exists AND has role 'admin'
     return isset($_SESSION['admin_session']) && $_SESSION['admin_session']['role'] === 'admin';
 }
+
 function isLogged() {
-    // Allow either Admin OR Kiosk to read data
+    // Allow if either Admin OR Kiosk is logged in (Kiosk needs to read the menu)
     return isset($_SESSION['admin_session']) || isset($_SESSION['kiosk_session']);
 }
-// --------------------
+// ------------------------------------------------
 
+// 1. GET ALL PRODUCTS
 if ($action == 'get_all') {
     if(!isLogged()) { echo json_encode([]); exit; }
-    $result = $conn->query("SELECT * FROM products ORDER BY sort_order ASC");
+    
+    $sql = "SELECT * FROM products ORDER BY sort_order ASC";
+    $result = $conn->query($sql);
     $products = [];
     while($row = $result->fetch_assoc()) {
         $row['image_url'] = $row['image'] ? "uploads/" . $row['image'] : null;
@@ -26,67 +31,88 @@ if ($action == 'get_all') {
     echo json_encode($products);
 }
 
+// 2. SAVE PRODUCT
 if ($action == 'save') {
-    if (!isAdmin()) { echo json_encode(["status"=>"error"]); exit; }
-    $name = $_POST['name']; $price = $_POST['price']; $cat = $_POST['category']; $id = $_POST['id'] ?? ''; $avail = $_POST['is_available'];
-    
+    if (!isAdmin()) { echo json_encode(["status" => "error", "message" => "Unauthorized"]); exit; }
+
+    $name = $_POST['name'];
+    $price = $_POST['price'];
+    $category = $_POST['category'];
+    $id = $_POST['id'] ?? '';
+    $is_available = $_POST['is_available']; 
+
     $imagePath = null;
     if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-        $imagePath = time() . "_" . $_FILES['image']['name'];
-        move_uploaded_file($_FILES['image']['tmp_name'], "uploads/" . $imagePath);
+        $filename = time() . "_" . $_FILES['image']['name'];
+        move_uploaded_file($_FILES['image']['tmp_name'], "uploads/" . $filename);
+        $imagePath = $filename;
     }
 
     if ($id) {
         if ($imagePath) {
             $stmt = $conn->prepare("UPDATE products SET name=?, price=?, category=?, is_available=?, image=? WHERE id=?");
-            $stmt->bind_param("sdsisi", $name, $price, $cat, $avail, $imagePath, $id);
+            $stmt->bind_param("sdsisi", $name, $price, $category, $is_available, $imagePath, $id);
         } else {
             $stmt = $conn->prepare("UPDATE products SET name=?, price=?, category=?, is_available=? WHERE id=?");
-            $stmt->bind_param("sdsii", $name, $price, $cat, $avail, $id);
+            $stmt->bind_param("sdsii", $name, $price, $category, $is_available, $id);
         }
     } else {
         $stmt = $conn->prepare("INSERT INTO products (name, price, category, is_available, image) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("sdsis", $name, $price, $cat, $avail, $imagePath);
+        $stmt->bind_param("sdsis", $name, $price, $category, $is_available, $imagePath);
     }
-    $stmt->execute();
-    echo json_encode(["status" => "success"]);
+    
+    if($stmt->execute()) echo json_encode(["status" => "success"]);
+    else echo json_encode(["status" => "error"]);
 }
 
+// 3. DELETE PRODUCT
 if ($action == 'delete') {
-    if (!isAdmin()) exit;
+    if (!isAdmin()) { echo json_encode(["status" => "error"]); exit; }
     $id = $_POST['id'];
     $conn->query("DELETE FROM products WHERE id=$id");
     echo json_encode(["status" => "success"]);
 }
 
+// 4. TOGGLE STOCK
 if ($action == 'toggle_stock') {
-    if (!isset($_SESSION['admin_session'])) exit; // Staff or Admin
-    $id = $_POST['id']; $status = $_POST['status'];
+    // Only Admin or Staff (dashboard users) can toggle stock
+    if (!isset($_SESSION['admin_session'])) { echo json_encode(["status" => "error"]); exit; }
+    
+    $id = $_POST['id'];
+    $status = $_POST['status']; 
     $stmt = $conn->prepare("UPDATE products SET is_available=? WHERE id=?");
     $stmt->bind_param("ii", $status, $id);
     $stmt->execute();
     echo json_encode(["status" => "success"]);
 }
 
+// 5. GET CATEGORIES
 if ($action == 'get_categories') {
     if(!isLogged()) { echo json_encode([]); exit; }
-    $result = $conn->query("SELECT * FROM categories ORDER BY sort_order ASC");
+    $sql = "SELECT * FROM categories ORDER BY sort_order ASC";
+    $result = $conn->query($sql);
     $cats = [];
     while($row = $result->fetch_assoc()) $cats[] = $row;
     echo json_encode($cats);
 }
 
+// 6. SAVE CATEGORY
 if ($action == 'save_category') {
-    if (!isAdmin()) exit;
+    if (!isAdmin()) { echo json_encode(["status" => "error"]); exit; }
     $data = json_decode(file_get_contents("php://input"), true);
-    $id = $data['id'] ?? null; $name = $data['name']; $icon = $data['icon'];
+    $id = $data['id'] ?? null;
+    $name = $data['name'];
+    $icon = $data['icon'];
     
     if ($id) {
-        $oldName = $conn->query("SELECT name FROM categories WHERE id=$id")->fetch_assoc()['name'];
+        $oldQuery = $conn->query("SELECT name FROM categories WHERE id=$id");
+        $oldName = $oldQuery->fetch_assoc()['name'];
         $stmt = $conn->prepare("UPDATE categories SET name=?, icon=? WHERE id=?");
         $stmt->bind_param("ssi", $name, $icon, $id);
         $stmt->execute();
-        $conn->query("UPDATE products SET category='$name' WHERE category='$oldName'");
+        $updateProds = $conn->prepare("UPDATE products SET category=? WHERE category=?");
+        $updateProds->bind_param("ss", $name, $oldName);
+        $updateProds->execute();
     } else {
         $stmt = $conn->prepare("INSERT INTO categories (name, icon) VALUES (?, ?)");
         $stmt->bind_param("ss", $name, $icon);
@@ -95,17 +121,20 @@ if ($action == 'save_category') {
     echo json_encode(["status" => "success"]);
 }
 
+// 7. DELETE CATEGORY
 if ($action == 'delete_category') {
-    if (!isAdmin()) exit;
+    if (!isAdmin()) { echo json_encode(["status" => "error"]); exit; }
     $id = $_POST['id'];
     $conn->query("DELETE FROM categories WHERE id=$id");
     echo json_encode(["status" => "success"]);
 }
 
+// 8. REORDER PRODUCTS/CATEGORIES
 if ($action == 'reorder_products' || $action == 'reorder_categories') {
-    if (!isAdmin()) exit;
+    if (!isAdmin()) { echo json_encode(["status" => "error"]); exit; }
     $data = json_decode(file_get_contents("php://input"), true);
     $table = ($action == 'reorder_products') ? 'products' : 'categories';
+    
     $stmt = $conn->prepare("UPDATE $table SET sort_order=? WHERE id=?");
     foreach ($data['items'] as $index => $item) {
         $stmt->bind_param("ii", $index, $item['id']);
