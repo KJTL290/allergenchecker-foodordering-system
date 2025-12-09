@@ -350,12 +350,13 @@
                 custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords}))
             };
 
+            // Delay ensuring visibility
             setTimeout(() => {
                 new QRCode(qrContainer, {
                     text: JSON.stringify(qrData),
                     width: 180,
                     height: 180,
-                    colorDark : "#c62828",
+                    colorDark : "#000000", // <--- CHANGED TO BLACK FOR BETTER SCANNING
                     colorLight : "#ffffff",
                     correctLevel : QRCode.CorrectLevel.M
                 });

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StaffGuard - Safety Check</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #2c3e50; color: white; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+
+        /* HEADER */
+        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .brand { font-size: 1.5rem; font-weight: 800; color: #ffc107; display: flex; align-items: center; gap: 10px; }
+        .status-badge { background: #4caf50; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+
+        /* CARD */
+        .card { background: white; color: #333; width: 100%; max-width: 500px; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        
+        /* SCANNER VIEW */
+        #view-scan { padding: 20px; text-align: center; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 20px; }
+        .instruction { color: #666; margin-bottom: 20px; }
+
+        /* PROFILE VIEW */
+        #view-profile { display: none; }
+        
+        .med-header { background: #e3f2fd; padding: 25px; text-align: center; border-bottom: 1px solid #bbdefb; }
+        .med-header.severe { background: #ffebee; border-color: #ffcdd2; }
+        
+        .avatar { font-size: 4rem; margin-bottom: 10px; display: block; }
+        .guest-name { font-size: 1.8rem; font-weight: 800; margin: 0; }
+        .guest-id { font-size: 0.9rem; opacity: 0.6; font-family: monospace; }
+
+        /* ALLERGY TAGS */
+        .allergy-section { padding: 20px; }
+        .section-title { font-size: 0.9rem; font-weight: 700; color: #777; text-transform: uppercase; margin-bottom: 10px; display: block; }
+        
+        .tag-container { display: flex; flex-wrap: wrap; gap: 10px; }
+        .tag { padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .tag.alert { background: #d32f2f; color: white; }
+        .tag.safe { background: #eee; color: #555; }
+
+        /* DISH CHECKER */
+        .checker-section { border-top: 1px solid #eee; padding: 20px; background: #fafafa; }
+        .checker-input { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 12px; font-size: 1rem; margin-bottom: 10px; }
+        .result-box { padding: 15px; border-radius: 12px; display: none; font-weight: bold; text-align: center; }
+        .result-box.safe { background: #e8f5e9; color: #2e7d32; border: 2px solid #c8e6c9; }
+        .result-box.unsafe { background: #ffebee; color: #c62828; border: 2px solid #ef5350; }
+
+        /* FOOTER */
+        .footer { padding: 20px; text-align: center; border-top: 1px solid #eee; }
+        .btn-reset { background: #333; color: white; border: none; padding: 12px 30px; border-radius: 30px; font-weight: bold; cursor: pointer; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="brand">🛡️ StaffGuard</div>
+        <div class="status-badge">ONLINE</div>
+    </div>
+
+    <div class="card">
+        
+        <div id="view-scan">
+            <h2 style="margin-top:0;">Scan Guest ID</h2>
+            <p class="instruction">Point camera at the customer's AllergyPass.</p>
+            <div id="reader"></div>
+        </div>
+
+        <div id="view-profile">
+            <div class="med-header severe" id="profileHeader">
+                <span class="avatar">👤</span>
+                <h1 class="guest-name" id="gName">Guest</h1>
+                <div class="guest-id" id="gID">ID: ---</div>
+            </div>
+
+            <div class="allergy-section">
+                <span class="section-title">⛔ Medical Restrictions</span>
+                <div class="tag-container" id="allergyTags"></div>
+            </div>
+
+            <div class="checker-section">
+                <span class="section-title">🍽️ Validate a Dish</span>
+                <p style="margin:0 0 10px 0; color:#666; font-size:0.9rem;">Select a menu item to check safety for <b>this guest</b>.</p>
+                
+                <select id="dishSelect" class="checker-input" onchange="checkFood()">
+                    <option value="">-- Select Dish --</option>
+                    <option value="Cheese Pizza">Cheese Pizza (Dairy, Gluten)</option>
+                    <option value="Peanut Butter Sandwich">PB Sandwich (Peanuts, Gluten)</option>
+                    <option value="Shrimp Salad">Shrimp Salad (Shellfish)</option>
+                    <option value="Tofu Curry">Tofu Curry (Soy)</option>
+                    <option value="Omelette">Omelette (Eggs)</option>
+                    <option value="Fruit Bowl">Fruit Bowl (Safe)</option>
+                    <option value="Eggplant Parmesan">Eggplant Parm (Nightshades)</option>
+                </select>
+
+                <div id="safetyResult" class="result-box"></div>
+            </div>
+
+            <div class="footer">
+                <button class="btn-reset" onclick="resetScanner()">Scan Next Guest</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let currentGuest = null;
+        let html5QrcodeScanner = null;
+        let isProcessing = false; // LOCK VARIABLE
+
+        // Dummy Menu Data (Simulating DB)
+        const menuDB = {
+            "Cheese Pizza": ["milk", "cheese", "dairy", "flour", "gluten", "wheat"],
+            "Peanut Butter Sandwich": ["peanut", "nut", "bread", "gluten", "wheat"],
+            "Shrimp Salad": ["shrimp", "shellfish", "lettuce"],
+            "Tofu Curry": ["tofu", "soy", "spices"],
+            "Omelette": ["egg", "eggs", "oil"],
+            "Fruit Bowl": ["apple", "banana", "melon"],
+            "Eggplant Parmesan": ["eggplant", "tomato", "cheese", "nightshade"]
+        };
+
+        function startScanner() {
+            if(html5QrcodeScanner) { html5QrcodeScanner.clear(); } // Clear existing
+            
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            isProcessing = false;
+        }
+
+        function onScanSuccess(decodedText) {
+            // If already working on a code, ignore subsequent frames
+            if (isProcessing) return;
+
+            try {
+                const data = JSON.parse(decodedText);
+                
+                // If we get here, it's valid JSON
+                isProcessing = true;
+                html5QrcodeScanner.clear(); // Stop camera immediately
+                loadProfile(data);
+                
+            } catch (e) {
+                // If JSON fails, it might be a partial scan. 
+                // DO NOT ALERT. Just log and let it keep trying.
+                console.warn("Scan ignored (Invalid JSON):", decodedText);
+            }
+        }
+
+        function onScanFailure(error) {
+            // Handle scan failure, usually better to ignore and keep scanning.
+            // console.warn(`Code scan error = ${error}`);
+        }
+
+        function loadProfile(data) {
+            currentGuest = data;
+            
+            let allRestrictions = [...data.allergies];
+            if (data.custom) {
+                data.custom.forEach(c => allRestrictions.push(c.name));
+            }
+
+            document.getElementById('view-scan').style.display = 'none';
+            document.getElementById('view-profile').style.display = 'block';
+            
+            document.getElementById('gName').innerText = data.name;
+            document.getElementById('gID').innerText = "ID: " + (data.id || "N/A");
+
+            const tagContainer = document.getElementById('allergyTags');
+            tagContainer.innerHTML = '';
+            
+            if (allRestrictions.length === 0) {
+                tagContainer.innerHTML = '<span class="tag safe">✅ No Known Allergies</span>';
+                document.getElementById('profileHeader').className = 'med-header';
+            } else {
+                allRestrictions.forEach(alg => {
+                    tagContainer.innerHTML += `<span class="tag alert">⚠️ ${alg}</span>`;
+                });
+                document.getElementById('profileHeader').className = 'med-header severe';
+            }
+        }
+
+        function checkFood() {
+            const dishName = document.getElementById('dishSelect').value;
+            const resultBox = document.getElementById('safetyResult');
+            
+            if (!dishName || !currentGuest) {
+                resultBox.style.display = 'none';
+                return;
+            }
+
+            const ingredients = menuDB[dishName] || [];
+            let userDangerWords = [];
+            
+            currentGuest.allergies.forEach(alg => {
+                userDangerWords.push(alg.toLowerCase());
+                if(alg === 'Dairy') userDangerWords.push('milk', 'cheese', 'cream');
+                if(alg === 'Gluten') userDangerWords.push('wheat', 'flour', 'bread');
+            });
+
+            if (currentGuest.custom) {
+                currentGuest.custom.forEach(c => {
+                    userDangerWords.push(c.name.toLowerCase());
+                    c.keywords.forEach(k => userDangerWords.push(k.toLowerCase()));
+                });
+            }
+
+            let conflicts = [];
+            ingredients.forEach(ing => {
+                if (userDangerWords.some(danger => ing.includes(danger) || danger.includes(ing))) {
+                    conflicts.push(ing);
+                }
+            });
+
+            resultBox.style.display = 'block';
+            if (conflicts.length > 0) {
+                resultBox.className = 'result-box unsafe';
+                resultBox.innerHTML = `⛔ UNSAFE: Contains ${conflicts.join(", ").toUpperCase()}`;
+            } else {
+                resultBox.className = 'result-box safe';
+                resultBox.innerHTML = `✅ SAFE for ${currentGuest.name}`;
+            }
+        }
+
+        function resetScanner() {
+            document.getElementById('view-profile').style.display = 'none';
+            document.getElementById('view-scan').style.display = 'block';
+            document.getElementById('dishSelect').value = "";
+            document.getElementById('safetyResult').style.display = 'none';
+            startScanner();
+        }
+
+        // Init
+        startScanner();
+
+    </script>
+</body>
+</html>

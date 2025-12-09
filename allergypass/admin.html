@@ -91,6 +91,9 @@
     <div class="container" id="dashboard">
         <div class="header">
             <h1>🛡️ AllergyPass <span style="font-size:1rem; color:#777; font-weight:normal;">Admin</span></h1>
+            <button class="btn-logout" onclick="window.open('test.html', '_blank')" style="background:#e3f2fd; color:#1565c0; border-color:#2196f3; margin-right:10px;">
+            🛠️ Test Tool
+            </button>
             <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
 
@@ -235,16 +238,22 @@
         function deleteItem(id) { if(!confirm("Delete?")) return; fetch('admin_api.php?action=delete_common', { method:'POST', body:JSON.stringify({id}) }).then(loadCommon); }
         function deleteUser(id) { if(!confirm("Delete User?")) return; fetch('admin_api.php?action=delete_user', { method:'POST', body:JSON.stringify({id}) }).then(() => { loadUsers(); loadStats(); }); }
 
-        // --- EDIT MODAL ---
+        // --- EDIT MODAL (FIXED) ---
         function openEdit(id) {
-            const item = commonData.find(c => c.id === id);
+            // FIX: Using loose equality (==) to match string "1" with number 1
+            const item = commonData.find(c => c.id == id);
+            
+            if (!item) return alert("Error: Could not find allergen data.");
+
             document.getElementById('edit_id').value = item.id;
             document.getElementById('edit_name').value = item.name;
             document.getElementById('edit_icon').value = item.icon;
+            
             tempKeywords = item.keywords ? [...item.keywords] : [];
             renderChips();
             document.getElementById('editModal').style.display = 'flex';
         }
+        
         function closeModal() { document.getElementById('editModal').style.display = 'none'; }
         
         function addChip() {
@@ -273,6 +282,7 @@
             document.getElementById('tab-' + tab).classList.add('active');
         }
 
+        // Check Session
         fetch('admin_api.php?action=check_session').then(res=>res.json()).then(d => { if(d.status === 'logged_in') { document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard').classList.add('visible'); loadAllData(); }});
     </script>
 </body>
