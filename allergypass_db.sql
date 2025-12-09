@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 09, 2025 at 04:37 PM
+-- Generation Time: Dec 09, 2025 at 05:45 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -64,7 +64,8 @@ INSERT INTO `common_allergens` (`id`, `name`, `icon`) VALUES
 (5, 'Eggs', '🥚'),
 (6, 'Soy', '🌱'),
 (7, 'Tree Nuts', '🌰'),
-(8, 'Fish', '🐟');
+(8, 'Fish', '🐟'),
+(10, 'Nightshades', '🥀');
 
 -- --------------------------------------------------------
 
@@ -143,29 +144,6 @@ INSERT INTO `common_keywords` (`id`, `common_allergen_id`, `word`) VALUES
 (100, 3, 'Crab Extract'),
 (101, 3, 'Lobster Extract'),
 (102, 3, 'Seafood Seasoning'),
-(185, 2, 'Milk'),
-(186, 2, 'Whole Milk Powder'),
-(187, 2, 'Skim Milk Powder'),
-(188, 2, 'Cream'),
-(189, 2, 'Butter'),
-(190, 2, 'Ghee'),
-(191, 2, 'Cheese'),
-(192, 2, 'Yogurt'),
-(193, 2, 'Whey'),
-(194, 2, 'Casein'),
-(195, 2, 'Lactose'),
-(196, 2, 'Buttermilk'),
-(197, 2, 'Milkfat'),
-(198, 2, 'Curds'),
-(199, 2, 'Cheddar Cheese'),
-(200, 2, 'Cream Cheese'),
-(201, 2, 'Heavy Cream'),
-(202, 2, 'Heavy Whipping Cream'),
-(203, 2, 'Sour Cream'),
-(204, 2, 'Whole Milk'),
-(205, 2, 'Fresh Milk'),
-(206, 2, 'Condensed Milk'),
-(207, 2, 'Evaporated Milk'),
 (208, 4, 'Wheat'),
 (209, 4, 'Barley'),
 (210, 4, 'Rye'),
@@ -196,7 +174,31 @@ INSERT INTO `common_keywords` (`id`, `common_allergen_id`, `word`) VALUES
 (235, 6, 'Tempeh'),
 (236, 6, 'Edamame'),
 (237, 6, 'Dark Chocolate'),
-(238, 6, 'Chocolate Batons');
+(238, 6, 'Chocolate Batons'),
+(239, 2, 'Milk'),
+(240, 2, 'Whole Milk Powder'),
+(241, 2, 'Skim Milk Powder'),
+(242, 2, 'Cream'),
+(243, 2, 'Butter'),
+(244, 2, 'Ghee'),
+(245, 2, 'Cheese'),
+(246, 2, 'Yogurt'),
+(247, 2, 'Whey'),
+(248, 2, 'Casein'),
+(249, 2, 'Lactose'),
+(250, 2, 'Buttermilk'),
+(251, 2, 'Milkfat'),
+(252, 2, 'Curds'),
+(253, 2, 'Cheddar Cheese'),
+(254, 2, 'Cream Cheese'),
+(255, 2, 'Heavy Cream'),
+(256, 2, 'Heavy Whipping Cream'),
+(257, 2, 'Sour Cream'),
+(258, 2, 'Whole Milk'),
+(259, 2, 'Fresh Milk'),
+(260, 2, 'Condensed Milk'),
+(261, 2, 'Evaporated Milk'),
+(264, 10, 'Belladonna');
 
 -- --------------------------------------------------------
 
@@ -211,6 +213,13 @@ CREATE TABLE `custom_allergens` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `custom_allergens`
+--
+
+INSERT INTO `custom_allergens` (`id`, `user_id`, `name`, `created_at`) VALUES
+(18, 6, 'Coffee', '2025-12-09 16:31:27');
+
 -- --------------------------------------------------------
 
 --
@@ -222,6 +231,13 @@ CREATE TABLE `custom_keywords` (
   `custom_allergen_id` int(11) NOT NULL,
   `word` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `custom_keywords`
+--
+
+INSERT INTO `custom_keywords` (`id`, `custom_allergen_id`, `word`) VALUES
+(26, 18, 'Caffene');
 
 -- --------------------------------------------------------
 
@@ -261,8 +277,7 @@ CREATE TABLE `user_allergies` (
 --
 
 INSERT INTO `user_allergies` (`id`, `user_id`, `allergy_name`) VALUES
-(7, 6, 'Shellfish'),
-(8, 6, 'Peanuts');
+(10, 6, 'Dairy');
 
 --
 -- Indexes for dumped tables
@@ -331,25 +346,25 @@ ALTER TABLE `admins`
 -- AUTO_INCREMENT for table `common_allergens`
 --
 ALTER TABLE `common_allergens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `common_keywords`
 --
 ALTER TABLE `common_keywords`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=239;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=265;
 
 --
 -- AUTO_INCREMENT for table `custom_allergens`
 --
 ALTER TABLE `custom_allergens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `custom_keywords`
 --
 ALTER TABLE `custom_keywords`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -361,7 +376,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `user_allergies`
 --
 ALTER TABLE `user_allergies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- Constraints for dumped tables
