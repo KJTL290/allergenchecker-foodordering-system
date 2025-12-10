@@ -364,13 +364,45 @@
         }
 
         function downloadQR() {
-            const img = document.querySelector("#qrcode img");
-            if (img && img.src) {
-                const link = document.createElement("a");
-                link.href = img.src;
-                link.download = "My_AllergyPass.png";
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            } else { alert("QR Code not generated yet."); }
+            let qrElement = document.querySelector("#qrcode canvas"); 
+            if (!qrElement) qrElement = document.querySelector("#qrcode img");
+
+            if (!qrElement) { 
+                alert("QR Code not generated yet."); 
+                return;
+            }
+
+            
+            const PADDING = 30; 
+
+            
+            const qrSize = qrElement.width || qrElement.naturalWidth;
+            
+            
+            const newSize = qrSize + 2 * PADDING;
+
+            
+            const paddedCanvas = document.createElement('canvas');
+            paddedCanvas.width = newSize;
+            paddedCanvas.height = newSize;
+            const ctx = paddedCanvas.getContext('2d');
+
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, newSize, newSize);
+
+            
+            ctx.drawImage(qrElement, PADDING, PADDING, qrSize, qrSize);
+
+            
+            const dataURL = paddedCanvas.toDataURL("image/png");
+
+            const link = document.createElement("a");
+            link.href = dataURL;
+            link.download = "My_AllergyPass.png";
+            document.body.appendChild(link); 
+            link.click(); 
+            document.body.removeChild(link);
         }
 
         function switchView(viewName) {
