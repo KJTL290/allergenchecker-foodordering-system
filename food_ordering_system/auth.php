@@ -69,11 +69,45 @@ if ($action == 'get_users') {
 if ($action == 'add_user') {
     if (!isAdmin()) exit;
     $data = json_decode(file_get_contents("php://input"), true);
+    
+    // Check if user already exists
+    $check = $conn->prepare("SELECT id FROM users WHERE username=?");
+    $check->bind_param("s", $data['username']);
+    $check->execute();
+    if($check->get_result()->num_rows > 0) {
+        echo json_encode(["status"=>"error", "message"=>"Username already taken"]);
+        exit;
+    }
+
     $stmt = $conn->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
     $pass = md5($data['password']);
     $stmt->bind_param("sss", $data['username'], $pass, $data['role']);
     echo $stmt->execute() ? json_encode(["status"=>"success"]) : json_encode(["status"=>"error"]);
 }
+
+// --- NEW UPDATE USER LOGIC ---
+if ($action == 'update_user') {
+    if (!isAdmin()) exit;
+    $data = json_decode(file_get_contents("php://input"), true);
+    
+    $id = $data['id'];
+    $user = $data['username'];
+    $role = $data['role'];
+    
+    // Check if password was provided
+    if (isset($data['password']) && !empty($data['password'])) {
+        $pass = md5($data['password']);
+        $stmt = $conn->prepare("UPDATE users SET username=?, role=?, password=? WHERE id=?");
+        $stmt->bind_param("sssi", $user, $role, $pass, $id);
+    } else {
+        // Keep old password
+        $stmt = $conn->prepare("UPDATE users SET username=?, role=? WHERE id=?");
+        $stmt->bind_param("ssi", $user, $role, $id);
+    }
+    
+    echo $stmt->execute() ? json_encode(["status"=>"success"]) : json_encode(["status"=>"error"]);
+}
+// -----------------------------
 
 if ($action == 'delete_user') {
     if (!isAdmin()) exit;

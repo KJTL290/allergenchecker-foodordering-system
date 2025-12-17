@@ -6,15 +6,27 @@
     <title>AllergyPass Admin</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* COPY CSS FROM PREVIOUS UPLOAD */
-        /* ... */
+        /* ... (CSS unchanged from original) ... */
         * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         body { background-color: #f4f6f8; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; z-index: 100; display: flex; align-items: center; justify-content: center; }
         .login-box { background: white; padding: 40px; border-radius: 12px; width: 350px; text-align: center; }
         .login-box h2 { margin-top: 0; color: #333; }
         .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; }
+        
+        /* Main Login Button */
         .login-box button { width: 100%; padding: 12px; background: #c62828; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        
+        /* PASSWORD TOGGLE - Force Transparent */
+        .password-wrap { position: relative; width: 100%; margin: 10px 0; }
+        .password-wrap input { margin: 0; padding-right: 40px; }
+        .toggle-btn { 
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%); 
+            cursor: pointer; background: transparent !important; border: none; 
+            font-size: 1.2rem; opacity: 0.6; padding: 0 !important; width: auto !important; color: #333 !important; margin: 0 !important;
+        }
+        .toggle-btn:hover { opacity: 1; }
+
         .container { width: 100%; max-width: 1000px; padding: 20px; display: none; }
         .container.visible { display: block; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -66,7 +78,10 @@
         <div class="login-box">
             <h2>🛡️ Admin Login</h2>
             <input type="text" id="u_name" placeholder="Username">
-            <input type="password" id="u_pass" placeholder="Password">
+            <div class="password-wrap">
+                <input type="password" id="u_pass" placeholder="Password">
+                <button class="toggle-btn" onclick="togglePass('u_pass')">🔍</button>
+            </div>
             <button onclick="login()">Login</button>
         </div>
     </div>
@@ -74,9 +89,7 @@
     <div class="container" id="dashboard">
         <div class="header">
             <h1>🛡️ AllergyPass <span style="font-size:1rem; color:#777; font-weight:normal;">Admin</span></h1>
-            <button class="btn-logout" onclick="window.open('test.html', '_blank')" style="background:#e3f2fd; color:#1565c0; border-color:#2196f3; margin-right:10px;">
-            🛠️ Test Tool
-            </button>
+            <button class="btn-logout" onclick="window.open('test.html', '_blank')" style="background:#e3f2fd; color:#1565c0; border-color:#2196f3; margin-right:10px;">🛠️ Test Tool</button>
             <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
 
@@ -139,6 +152,11 @@
 
     <script>
         let commonData = [], tempKeywords = [];
+
+        function togglePass(id) {
+            const x = document.getElementById(id);
+            x.type = x.type === "password" ? "text" : "password";
+        }
 
         function login() {
             const u = document.getElementById('u_name').value; const p = document.getElementById('u_pass').value;

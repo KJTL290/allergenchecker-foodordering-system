@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body {
-            background-color: #2c3e50; /* Darker professional background */
+            background-color: #2c3e50;
             height: 100vh;
             display: flex; align-items: center; justify-content: center;
         }
@@ -32,13 +32,23 @@
         }
         input:focus { border-color: #2196f3; }
         
-        button {
+        /* PASSWORD TOGGLE */
+        .password-wrap { position: relative; width: 100%; }
+        .password-wrap input { padding-right: 45px; }
+        .toggle-btn { 
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%); 
+            cursor: pointer; background: none; border: none; font-size: 1.2rem; opacity: 0.6;
+            padding: 0; width: auto; color: #333; margin: 0;
+        }
+        .toggle-btn:hover { opacity: 1; }
+        
+        button.login-btn {
             width: 100%; padding: 14px; background-color: #2196f3;
             color: white; border: none; border-radius: 8px;
             font-size: 1.1rem; font-weight: 600; cursor: pointer;
             transition: 0.2s; margin-top: 10px;
         }
-        button:hover { background-color: #1976d2; transform: translateY(-1px); }
+        button.login-btn:hover { background-color: #1976d2; transform: translateY(-1px); }
         
         .error { 
             background: #ffebee; color: #c62828; padding: 10px; 
@@ -61,13 +71,20 @@
         </div>
         <div class="form-group">
             <label>Password</label>
-            <input type="password" id="password" placeholder="Enter password">
+            <div class="password-wrap">
+                <input type="password" id="password" placeholder="Enter password">
+                <button class="toggle-btn" onclick="togglePass('password')">🔍</button>
+            </div>
         </div>
-        <button onclick="login()">Sign In</button>
+        <button class="login-btn" onclick="login()">Sign In</button>
     </div>
 
     <script>
-        // Allow "Enter" key to submit
+        function togglePass(id) {
+            const x = document.getElementById(id);
+            x.type = x.type === "password" ? "text" : "password";
+        }
+
         document.getElementById('password').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') login();
         });

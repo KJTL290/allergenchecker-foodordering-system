@@ -28,6 +28,15 @@
         .btn-danger { background: white; border: 1px solid #c62828; color: #c62828; margin-top: 30px; font-size: 0.8rem; }
         .link { text-align: center; color: #c62828; cursor: pointer; font-size: 0.9rem; margin-top: 10px; display: block; }
 
+        /* PASSWORD TOGGLE */
+        .password-wrap { position: relative; width: 100%; }
+        .password-wrap input { padding-right: 45px; }
+        .toggle-btn { 
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%); 
+            background: none; border: none; cursor: pointer; font-size: 1.2rem; opacity: 0.6; padding: 0;
+        }
+        .toggle-btn:hover { opacity: 1; }
+
         /* UNIFIED GRID SYSTEM */
         .section-label { font-weight: 700; color: #555; font-size: 0.9rem; margin-bottom: 5px; display: block; }
         .allergen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
@@ -39,10 +48,8 @@
         }
         .allergen-btn.active { background: #ffebee; border-color: #c62828; color: #c62828; }
         
-        /* Custom buttons now look exactly like active common ones */
-        .allergen-btn.custom-active { 
-            background: #ffebee; border-color: #c62828; color: #c62828; cursor: default;
-        }
+        /* Custom buttons */
+        .allergen-btn.custom-active { background: #ffebee; border-color: #c62828; color: #c62828; cursor: default; }
 
         /* EDITOR LIST */
         .editor-list { display: flex; flex-direction: column; gap: 10px; }
@@ -82,7 +89,10 @@
         <div id="view-login" class="body active">
             <h3 style="text-align:center;">Welcome Back</h3>
             <input type="text" id="l_user" placeholder="Username">
-            <input type="password" id="l_pass" placeholder="Password">
+            <div class="password-wrap">
+                <input type="password" id="l_pass" placeholder="Password">
+                <button class="toggle-btn" onclick="togglePass('l_pass')">🔍</button>
+            </div>
             <button class="btn btn-primary" onclick="login()">Sign In</button>
             <span class="link" onclick="switchView('register')">New User? Create Account</span>
         </div>
@@ -91,7 +101,10 @@
             <h3 style="text-align:center;">Create Account</h3>
             <input type="text" id="r_name" placeholder="Full Name">
             <input type="text" id="r_user" placeholder="Username">
-            <input type="password" id="r_pass" placeholder="Password">
+            <div class="password-wrap">
+                <input type="password" id="r_pass" placeholder="Password">
+                <button class="toggle-btn" onclick="togglePass('r_pass')">🔍</button>
+            </div>
             <button class="btn btn-primary" onclick="register()">Create Account</button>
             <span class="link" onclick="switchView('login')">Back to Login</span>
         </div>
@@ -142,18 +155,13 @@
     <div class="modal-overlay" id="editorModal">
         <div class="modal">
             <h3 id="modalHeader">Custom Allergy</h3>
-            
             <input type="hidden" id="edit_id">
-            
             <input type="text" id="c_name" placeholder="Category Name (e.g. Nightshades)">
-            
             <div class="chip-input-group">
                 <input type="text" id="c_word" placeholder="Ingredient (e.g. Tomato)">
                 <button class="btn-add-chip" onclick="addChip()">Add</button>
             </div>
-            
             <div class="chip-container" id="chipList"></div>
-            
             <button class="btn btn-primary" onclick="submitCustomAllergy()">Save Category</button>
             <button class="btn btn-secondary" style="margin-top:5px;" onclick="closeModal()">Cancel</button>
         </div>
@@ -166,23 +174,24 @@
         let currentUser = {};
         let tempKeywords = [];
 
+        function togglePass(id) {
+            const x = document.getElementById(id);
+            x.type = x.type === "password" ? "text" : "password";
+        }
+
         // --- AUTH ---
         function register() {
             const name = document.getElementById('r_name').value;
             const user = document.getElementById('r_user').value;
             const pass = document.getElementById('r_pass').value;
             if(!name || !user || !pass) return Swal.fire('Error', 'Fill all fields', 'error');
-            
             fetch('api.php?action=register', { method: 'POST', body: JSON.stringify({username:user, password:pass, full_name:name}) })
             .then(res=>res.json()).then(d => { 
                 if(d.status === 'success') {
                     Swal.fire('Success', 'Account Created!', 'success').then(() => loadProfile());
-                } else {
-                    Swal.fire('Error', d.message, 'error');
-                }
+                } else { Swal.fire('Error', d.message, 'error'); }
             });
         }
-
         function login() {
             const user = document.getElementById('l_user').value;
             const pass = document.getElementById('l_pass').value;
@@ -192,30 +201,16 @@
                 else Swal.fire('Login Failed', d.message, 'error'); 
             });
         }
-
         function logout() { fetch('api.php?action=logout').then(() => location.reload()); }
-
         function deleteAccount() { 
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "You won't be able to revert this!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#c62828',
-                cancelButtonColor: '#aaa',
-                confirmButtonText: 'Yes, delete it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch('api.php?action=delete_account').then(() => location.reload());
-                }
-            });
+            Swal.fire({title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#c62828', confirmButtonText: 'Yes, delete it!'})
+            .then((result) => { if (result.isConfirmed) fetch('api.php?action=delete_account').then(() => location.reload()); });
         }
 
         // --- DATA & UI ---
         async function loadProfile(targetView = null) {
             const resCommon = await fetch('api.php?action=get_common_allergens');
             commonAllergens = await resCommon.json();
-            
             const grid = document.getElementById('commonGrid');
             grid.innerHTML = '';
             commonAllergens.forEach(alg => {
@@ -227,14 +222,9 @@
                     currentUser = d;
                     activeAllergies = new Set(d.allergies);
                     customAllergens = d.custom_allergies;
-                    
-                    renderCustomGrid();
-                    updateEditorList();
-                    updateUI();
-                    
-                    if (targetView) {
-                        switchView(targetView);
-                    } else {
+                    renderCustomGrid(); updateEditorList(); updateUI();
+                    if (targetView) switchView(targetView);
+                    else {
                         if(d.allergies.length > 0 || d.custom_allergies.length > 0) renderPass();
                         else switchView('dashboard');
                     }
@@ -253,37 +243,23 @@
         function renderCustomGrid() {
             const grid = document.getElementById('customGrid');
             grid.innerHTML = customAllergens.length ? '' : '<span style="color:#aaa; font-size:0.9rem;">None.</span>';
-            
-            customAllergens.forEach(c => {
-                grid.innerHTML += `
-                    <div class="allergen-btn custom-active">
-                        ⚠️ ${c.name}
-                    </div>`;
-            });
+            customAllergens.forEach(c => { grid.innerHTML += `<div class="allergen-btn custom-active">⚠️ ${c.name}</div>`; });
         }
 
         function updateEditorList() {
             const list = document.getElementById('editorList');
             list.innerHTML = customAllergens.length ? '' : '<span style="text-align:center; color:#999;">No custom categories found.</span>';
-            
             customAllergens.forEach(c => {
                 list.innerHTML += `
                     <div class="editor-item">
-                        <div class="editor-info">
-                            <div>${c.name}</div>
-                            <small>${c.keywords.join(', ')}</small>
-                        </div>
-                        <div class="editor-actions">
-                            <button onclick="openModal(${c.id})">✏️</button>
-                            <button onclick="deleteCustom(${c.id})" style="color:#e57373;">🗑️</button>
-                        </div>
+                        <div class="editor-info"><div>${c.name}</div><small>${c.keywords.join(', ')}</small></div>
+                        <div class="editor-actions"><button onclick="openModal(${c.id})">✏️</button><button onclick="deleteCustom(${c.id})" style="color:#e57373;">🗑️</button></div>
                     </div>`;
             });
         }
 
         function toggleCommon(name) {
-            if (activeAllergies.has(name)) activeAllergies.delete(name);
-            else activeAllergies.add(name);
+            if (activeAllergies.has(name)) activeAllergies.delete(name); else activeAllergies.add(name);
             updateUI();
         }
 
@@ -292,12 +268,7 @@
             fetch('api.php?action=save_profile', { method: 'POST', body: JSON.stringify({allergies: list}) })
             .then(() => { 
                 currentUser.allergies = list; 
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Profile Saved',
-                    showConfirmButton: false,
-                    timer: 1500
-                }).then(() => renderPass());
+                Swal.fire({icon: 'success', title: 'Profile Saved', showConfirmButton: false, timer: 1500}).then(() => renderPass());
             });
         }
 
@@ -305,7 +276,6 @@
         function openModal(editId = null) {
             document.getElementById('editorModal').style.display = 'flex';
             document.getElementById('c_word').value = '';
-            
             if(editId) {
                 const item = customAllergens.find(c => c.id == editId);
                 document.getElementById('modalHeader').innerText = "Edit Category";
@@ -322,17 +292,11 @@
         }
 
         function closeModal() { document.getElementById('editorModal').style.display = 'none'; }
-
         function addChip() {
             const val = document.getElementById('c_word').value.trim();
             if(val) { tempKeywords.push(val); renderChips(); document.getElementById('c_word').value = ''; }
         }
-
-        function removeChip(index) {
-            tempKeywords.splice(index, 1);
-            renderChips();
-        }
-
+        function removeChip(index) { tempKeywords.splice(index, 1); renderChips(); }
         function renderChips() {
             const div = document.getElementById('chipList');
             div.innerHTML = tempKeywords.map((k, i) => `<div class="chip">${k} <span onclick="removeChip(${i})">×</span></div>`).join('');
@@ -341,35 +305,17 @@
         function submitCustomAllergy() {
             const idVal = document.getElementById('edit_id').value;
             const name = document.getElementById('c_name').value;
-            
             if(!name || tempKeywords.length === 0) return Swal.fire('Warning', 'Please add name and ingredients', 'warning');
-
             const action = (idVal && idVal !== "") ? 'update_custom_allergy' : 'add_custom_allergy';
             const body = { name: name, keywords: tempKeywords };
             if(idVal) body.id = idVal;
-
             fetch('api.php?action='+action, { method: 'POST', body: JSON.stringify(body) })
-            .then(() => { 
-                closeModal(); 
-                loadProfile('editor'); 
-                Swal.fire({icon: 'success', title: 'Saved', showConfirmButton: false, timer: 1000});
-            });
+            .then(() => { closeModal(); loadProfile('editor'); Swal.fire({icon: 'success', title: 'Saved', showConfirmButton: false, timer: 1000}); });
         }
 
         function deleteCustom(id) {
-            Swal.fire({
-                title: 'Delete this rule?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#aaa',
-                confirmButtonText: 'Yes, delete it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch('api.php?action=delete_custom_allergy', { method: 'POST', body: JSON.stringify({id: id}) })
-                    .then(() => loadProfile('editor'));
-                }
-            });
+            Swal.fire({title: 'Delete this rule?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete it!'})
+            .then((result) => { if (result.isConfirmed) fetch('api.php?action=delete_custom_allergy', { method: 'POST', body: JSON.stringify({id: id}) }).then(() => loadProfile('editor')); });
         }
 
         // --- QR RENDER ---
@@ -380,59 +326,30 @@
             const customStr = customAllergens.map(c => `${c.name} (${c.keywords.join(',')})`).join("; ");
             document.getElementById('passList').innerText = "Allergies: " + (commonStr || "None");
             document.getElementById('customPassDetails').innerText = customStr ? "Specific: " + customStr : "";
-
             const qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = "";
-            
-            const qrData = {
-                name: currentUser.name,
-                allergies: currentUser.allergies,
-                custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords}))
-            };
-
+            const qrData = { name: currentUser.name, allergies: currentUser.allergies, custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords})) };
             setTimeout(() => {
-                new QRCode(qrContainer, {
-                    text: JSON.stringify(qrData),
-                    width: 180,
-                    height: 180,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.M
-                });
+                new QRCode(qrContainer, { text: JSON.stringify(qrData), width: 180, height: 180, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.M });
             }, 300);
         }
 
         function downloadQR() {
             let qrElement = document.querySelector("#qrcode canvas"); 
             if (!qrElement) qrElement = document.querySelector("#qrcode img");
-
-            if (!qrElement) { 
-                Swal.fire('Info', 'QR Code not generated yet.', 'info'); 
-                return;
-            }
-
+            if (!qrElement) { Swal.fire('Info', 'QR Code not generated yet.', 'info'); return; }
             const PADDING = 30; 
             const qrSize = qrElement.width || qrElement.naturalWidth;
             const newSize = qrSize + 2 * PADDING;
-
             const paddedCanvas = document.createElement('canvas');
-            paddedCanvas.width = newSize;
-            paddedCanvas.height = newSize;
+            paddedCanvas.width = newSize; paddedCanvas.height = newSize;
             const ctx = paddedCanvas.getContext('2d');
-
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, newSize, newSize);
-
+            ctx.fillStyle = 'white'; ctx.fillRect(0, 0, newSize, newSize);
             ctx.drawImage(qrElement, PADDING, PADDING, qrSize, qrSize);
-
             const dataURL = paddedCanvas.toDataURL("image/png");
-
             const link = document.createElement("a");
-            link.href = dataURL;
-            link.download = "My_AllergyPass.png";
-            document.body.appendChild(link); 
-            link.click(); 
-            document.body.removeChild(link);
+            link.href = dataURL; link.download = "My_AllergyPass.png";
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
         function switchView(viewName) {
