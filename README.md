@@ -10,18 +10,18 @@ This project consists of two distinct but integrated applications:
 
 ### 1. 🛡️ AllergyPass (The Identity Provider)
 * **Location:** `/allergypass/`
-* **Purpose:** Allows users to create a verified medical profile and generates a secure QR code.
+* **Purpose:** Allows users to create a verified medical profile and generates a secure, scanner-friendly QR code.
 * **Key Interfaces:**
-    * **User App (`index.html`):** Customers select allergies (Dairy, Peanuts, Custom) and generate a High-Definition QR Pass.
+    * **User App (`index.html`):** Customers select allergies (Dairy, Peanuts, Custom) and generate a **High-Definition (Pixel-Perfect) QR Pass**.
     * **Admin Panel (`admin.html`):** Managers define the "Master Dictionary" of allergens (e.g., "Dairy = Milk, Cheese, Whey").
-    * **StaffGuard (`test.html`):** A standalone scanner for waiters to check a guest's safety at the table.
+    * **Allergy Display Terminal (`test.html`):** A standalone scanner for waiters to instantly view a guest's medical profile at the table.
 
 ### 2. 🍔 Food Queue System (The Service Provider)
 * **Location:** `/food_ordering_system/`
 * **Purpose:** Handles the restaurant's ordering, kitchen workflow, and digital signage.
 * **Key Interfaces:**
     * **Kiosk (`kiosk.html`):** Self-ordering tablet. **Now integrated with a camera** to scan AllergyPass QRs and warn users about unsafe food.
-    * **Kitchen Dashboard (`dashboard.html`):** Command center for managing orders, stock, and menu ingredients.
+    * **Kitchen Dashboard (`dashboard.html`):** Command center for managing orders, stock, menu ingredients, and **staff users**.
     * **Public Monitor (`monitor.html`):** TV display for "Preparing/Ready" order numbers.
 
 ---
@@ -36,11 +36,17 @@ This project consists of two distinct but integrated applications:
     * **Unsafe Items:** Highlighted with a **"⛔ Contains [Allergen]"** badge.
     * **Intervention:** If a user tries to add an unsafe item, a "Medical Alert" confirmation pops up.
 
+### ✨ Recent Updates (v2.0)
+* **HD QR Engine:** Completely rewritten download logic. Uses HTML5 Canvas to generate **pixel-perfect, non-blurry QR codes** with proper quiet zones for instant scanning.
+* **Modern UI/UX:** Replaced all native browser popups with **SweetAlert2** for professional, mobile-friendly notifications.
+* **Password Visibility:** Added a "Reveal Password" toggle (🔍) to all login and registration screens for better usability.
+* **Advanced User Management:** Admins can now **Edit** existing users (update roles/usernames) and reset passwords directly from the Dashboard.
+
 ### 🛠️ Operational Tools
 * **Visual Menu Manager:** Drag-and-drop menu editing with ingredient management.
 * **Kanban Kitchen Board:** Track orders from "Pending" to "Ready".
 * **Financial History:** Export sales data to CSV.
-* **StaffGuard Tool:** A mobile-friendly scanner for waiters to validate dishes manually.
+* **Security:** Staff login required to unlock the Kiosk interface.
 
 ---
 
@@ -64,15 +70,26 @@ You need **two** separate databases.
 ### 3. File Deployment
 Copy the entire project folder to `htdocs`. Ensure the structure looks like this:
 
-/htdocs 
-/allergypass - index.html - admin.html - api.php 
-/food_ordering_system - kiosk.html - dashboard.html - get_user_profile.php (The Bridge)
+
+```
+
+/htdocs
+/allergypass
+- index.html
+- admin.html
+- api.php
+/food_ordering_system
+- kiosk.html
+- dashboard.html
+- get_user_profile.php (The Bridge)
+
+```
 
 ---
 
 ## 🔑 Login Credentials
 
-### Food System Admin (`/food_ordering_system/dashboard.html`)
+### Food System Admin (`/food_ordering_system/login.html`)
 | Role | Username | Password | Access |
 | :--- | :--- | :--- | :--- |
 | **Super Admin** | `admin` | `admin123` | Full Control (Menu, Users, History) |
@@ -95,10 +112,11 @@ Since phone cameras require HTTPS or Localhost, use this workflow:
 
 2.  **On Phone (Customer):**
     * Connect to the same Wi-Fi.
-    * Go to `http://[YOUR_LAPTOP_IP]/allergypass/` to create a profile and get a QR code.
+    * Go to `http://[YOUR_LAPTOP_IP]/allergypass/` to create a profile.
+    * **Download the Image:** Use the new "Download HD" button.
 
 3.  **The Interaction:**
-    * Show the Phone's QR code to the Laptop's Kiosk camera.
+    * Show the downloaded image to the Laptop's Kiosk camera.
     * Watch the menu react instantly!
 
 ---
@@ -107,6 +125,9 @@ Since phone cameras require HTTPS or Localhost, use this workflow:
 
 * **Camera not opening?**
     * Check if you are on `https://` or `localhost`. Browsers block cameras on insecure `http://` IPs. Use **ngrok** to tunnel your localhost if testing on a real phone.
-* **"No MultiFormat Readers" Error?**
-    * This means the camera sees the QR but can't focus.
-    * **Fix:** Turn down phone brightness to 50% and hold it 6 inches away. The new HD QR code should scan instantly.
+* **Scanner not detecting the QR?**
+    * Ensure you are using the **new downloaded image**. Older screenshots might be blurry.
+    * Hold the phone about 6 inches away from the camera.
+    * Ensure screen brightness is at ~50% (too bright washes out the camera).
+
+```
