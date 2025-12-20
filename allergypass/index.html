@@ -22,6 +22,7 @@
         input:focus { border-color: #c62828; }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; transition: 0.2s; }
         .btn-primary { background: #c62828; color: white; }
+        .btn-primary:disabled { background: #cccccc; cursor: not-allowed; }
         .btn-secondary { background: #eee; color: #333; }
         .btn-outline { background: white; border: 2px solid #eee; color: #555; margin-top: 5px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .btn-outline:hover { background: #f9f9f9; border-color: #ddd; }
@@ -31,11 +32,22 @@
         /* PASSWORD TOGGLE */
         .password-wrap { position: relative; width: 100%; }
         .password-wrap input { padding-right: 45px; }
-        .toggle-btn { 
-            position: absolute; right: 10px; top: 50%; transform: translateY(-50%); 
+        .toggle-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
             background: none; border: none; cursor: pointer; font-size: 1.2rem; opacity: 0.6; padding: 0;
         }
         .toggle-btn:hover { opacity: 1; }
+
+        /* BUTTON CLICK ANIMATION */
+        .btn-clicked {
+            animation: btnClickAnimation 0.3s ease;
+        }
+
+        @keyframes btnClickAnimation {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
 
         /* UNIFIED GRID SYSTEM */
         .section-label { font-weight: 700; color: #555; font-size: 0.9rem; margin-bottom: 5px; display: block; }
@@ -220,7 +232,21 @@
 
         function recoverPassword() {
             const email = document.getElementById('f_email').value;
+            const button = document.querySelector('#view-forgot .btn-primary');
             if(!email) return Swal.fire('Error', 'Please enter your email address', 'error');
+
+            // Add animation class to button to indicate click
+            button.classList.add('btn-clicked');
+
+            // Remove the animation class after animation completes
+            setTimeout(() => {
+                button.classList.remove('btn-clicked');
+            }, 300);
+
+            // Disable button and show loading state
+            button.disabled = true;
+            const originalText = button.textContent;
+            button.textContent = 'Sending...';
 
             fetch('api.php?action=recover_password', {
                 method: 'POST',
@@ -235,6 +261,14 @@
                 } else {
                     Swal.fire('Error', data.message, 'error');
                 }
+            })
+            .catch(error => {
+                Swal.fire('Error', 'An error occurred while sending the email. Please try again.', 'error');
+            })
+            .finally(() => {
+                // Restore button state
+                button.disabled = false;
+                button.textContent = originalText;
             });
         }
 

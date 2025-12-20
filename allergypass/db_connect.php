@@ -10,6 +10,9 @@ if ($conn->connect_error) {
     die(json_encode(["status" => "error", "message" => "Database Connection Failed"]));
 }
 
+// Set timezone for database connection
+$conn->query("SET time_zone = '+00:00'"); // UTC
+
 // Check and create email column if it doesn't exist
 $columns = $conn->query("SHOW COLUMNS FROM users LIKE 'email'");
 if ($columns->num_rows == 0) {
