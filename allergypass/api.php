@@ -9,12 +9,25 @@ $input = json_decode(file_get_contents("php://input"), true);
 // --- AUTH ---
 if ($action == 'register') {
     $user = $input['username']; $pass = md5($input['password']); $name = $input['full_name']; $email = $input['email'];
+
+    // Check if email column exists in users table
+    $columns = $conn->query("SHOW COLUMNS FROM users LIKE 'email'");
+    if ($columns->num_rows == 0) {
+        // If email column doesn't exist, add it
+        $conn->query("ALTER TABLE users ADD COLUMN email VARCHAR(100) UNIQUE");
+    }
+
     $check = $conn->query("SELECT id FROM users WHERE username = '$user'");
     if ($check->num_rows > 0) { echo json_encode(["status" => "error", "message" => "Username taken"]); exit; }
+
+    // Check if email already exists
+    $checkEmail = $conn->query("SELECT id FROM users WHERE email = '$email'");
+    if ($checkEmail->num_rows > 0) { echo json_encode(["status" => "error", "message" => "Email already registered"]); exit; }
+
     $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email) VALUES (?, ?, ?, ?)");
     $stmt->bind_param("ssss", $user, $pass, $name, $email);
     if ($stmt->execute()) { $_SESSION['user_id'] = $conn->insert_id; echo json_encode(["status" => "success"]); }
-    else echo json_encode(["status" => "error"]);
+    else echo json_encode(["status" => "error", "message" => $stmt->error]);
 }
 
 if ($action == 'login') {
@@ -23,7 +36,10 @@ if ($action == 'login') {
     $stmt->bind_param("ss", $user, $pass);
     $stmt->execute();
     $res = $stmt->get_result();
-    if ($row = $res->fetch_assoc()) { $_SESSION['user_id'] = $row['id']; echo json_encode(["status" => "success"]); }
+    if ($row = $res->fetch_assoc()) {
+        $_SESSION['user_id'] = $row['id'];
+        echo json_encode(["status" => "success"]);
+    }
     else echo json_encode(["status" => "error", "message" => "Invalid credentials"]);
 }
 
@@ -164,6 +180,24 @@ if ($action == 'recover_password') {
         exit;
     }
 
+    // Check if email column exists in users table
+    $columns = $conn->query("SHOW COLUMNS FROM users LIKE 'email'");
+    if ($columns->num_rows == 0) {
+        // If email column doesn't exist, add it
+        $conn->query("ALTER TABLE users ADD COLUMN email VARCHAR(100) UNIQUE");
+    }
+
+    // Also add reset_token and reset_token_expiry columns if they don't exist
+    $resetTokenColumn = $conn->query("SHOW COLUMNS FROM users LIKE 'reset_token'");
+    if ($resetTokenColumn->num_rows == 0) {
+        $conn->query("ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)");
+    }
+
+    $resetExpiryColumn = $conn->query("SHOW COLUMNS FROM users LIKE 'reset_token_expiry'");
+    if ($resetExpiryColumn->num_rows == 0) {
+        $conn->query("ALTER TABLE users ADD COLUMN reset_token_expiry DATETIME");
+    }
+
     // Find user by email
     $stmt = $conn->prepare("SELECT id, username, full_name FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
@@ -184,17 +218,23 @@ if ($action == 'recover_password') {
         $updateStmt->bind_param("ssi", $resetToken, $expiry, $userId);
 
         if ($updateStmt->execute()) {
-            // In a real application, you would send an email with the reset link
-            // For now, we'll simulate sending the email and return success
-            // You would use PHPMailer or similar library to send actual emails
-
-            // Example of how to send email (uncomment and configure in production):
-            /*
+            // Send password reset email
             $to = $email;
             $subject = "Password Reset Request - AllergyPass";
-            $resetLink = "https://yourdomain.com/reset_password.php?token=" . $resetToken;
-            $message = "Hello $fullName,\n\nYou have requested to reset your password. Please click the link below to reset your password:\n\n$resetLink\n\nThis link will expire in 1 hour.\n\nIf you did not request this, please ignore this email.\n\nBest regards,\nThe AllergyPass Team";
-            $headers = "From: noreply@allergypass.com";
+
+            // Using relative URL for the reset link (works for local development)
+            $resetLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]" . dirname($_SERVER['REQUEST_URI']) . "/reset_password.html?token=" . $resetToken;
+
+            $message = "Hello $fullName,\n\n";
+            $message .= "You have requested to reset your password. Please click the link below to reset your password:\n\n";
+            $message .= "$resetLink\n\n";
+            $message .= "This link will expire in 1 hour.\n\n";
+            $message .= "If you did not request this, please ignore this email.\n\n";
+            $message .= "Best regards,\nThe AllergyPass Team";
+
+            $headers = "From: noreply@allergypass.com\r\n";
+            $headers .= "Reply-To: noreply@allergypass.com\r\n";
+            $headers .= "X-Mailer: PHP/" . phpversion();
 
             if(mail($to, $subject, $message, $headers)) {
                 echo json_encode([
@@ -202,18 +242,14 @@ if ($action == 'recover_password') {
                     "message" => "Password reset link has been sent to your email address."
                 ]);
             } else {
+                // If email sending fails, clear the reset token
+                $conn->query("UPDATE users SET reset_token = NULL, reset_token_expiry = NULL WHERE id = $userId");
+
                 echo json_encode([
                     "status" => "error",
                     "message" => "Failed to send email. Please contact support."
                 ]);
             }
-            */
-
-            // For demonstration purposes, we'll return success
-            echo json_encode([
-                "status" => "success",
-                "message" => "Password reset link has been sent to your email address."
-            ]);
         } else {
             echo json_encode([
                 "status" => "error",
@@ -226,7 +262,6 @@ if ($action == 'recover_password') {
             "status" => "success",
             "message" => "If an account exists with this email, a password reset link has been sent."
         ]);
-    }
     }
 }
 
