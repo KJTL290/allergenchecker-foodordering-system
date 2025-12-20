@@ -94,6 +94,7 @@
                 <button class="toggle-btn" onclick="togglePass('l_pass')">🔍</button>
             </div>
             <button class="btn btn-primary" onclick="login()">Sign In</button>
+            <span class="link" onclick="switchView('forgot')">Forgot Password?</span>
             <span class="link" onclick="switchView('register')">New User? Create Account</span>
         </div>
 
@@ -101,11 +102,20 @@
             <h3 style="text-align:center;">Create Account</h3>
             <input type="text" id="r_name" placeholder="Full Name">
             <input type="text" id="r_user" placeholder="Username">
+            <input type="email" id="r_email" placeholder="Email Address">
             <div class="password-wrap">
                 <input type="password" id="r_pass" placeholder="Password">
                 <button class="toggle-btn" onclick="togglePass('r_pass')">🔍</button>
             </div>
             <button class="btn btn-primary" onclick="register()">Create Account</button>
+            <span class="link" onclick="switchView('login')">Back to Login</span>
+        </div>
+
+        <div id="view-forgot" class="body">
+            <h3 style="text-align:center;">Recover Your Account</h3>
+            <p style="text-align:center; color:#666; font-size:0.9rem; margin:5px 0 15px;">Enter your email to receive your password</p>
+            <input type="email" id="f_email" placeholder="Email Address">
+            <button class="btn btn-primary" onclick="recoverPassword()">Send Password</button>
             <span class="link" onclick="switchView('login')">Back to Login</span>
         </div>
 
@@ -183,10 +193,11 @@
         function register() {
             const name = document.getElementById('r_name').value;
             const user = document.getElementById('r_user').value;
+            const email = document.getElementById('r_email').value;
             const pass = document.getElementById('r_pass').value;
-            if(!name || !user || !pass) return Swal.fire('Error', 'Fill all fields', 'error');
-            fetch('api.php?action=register', { method: 'POST', body: JSON.stringify({username:user, password:pass, full_name:name}) })
-            .then(res=>res.json()).then(d => { 
+            if(!name || !user || !email || !pass) return Swal.fire('Error', 'Fill all fields', 'error');
+            fetch('api.php?action=register', { method: 'POST', body: JSON.stringify({username:user, password:pass, full_name:name, email:email}) })
+            .then(res=>res.json()).then(d => {
                 if(d.status === 'success') {
                     Swal.fire('Success', 'Account Created!', 'success').then(() => loadProfile());
                 } else { Swal.fire('Error', d.message, 'error'); }
@@ -202,9 +213,29 @@
             });
         }
         function logout() { fetch('api.php?action=logout').then(() => location.reload()); }
-        function deleteAccount() { 
+        function deleteAccount() {
             Swal.fire({title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#c62828', confirmButtonText: 'Yes, delete it!'})
             .then((result) => { if (result.isConfirmed) fetch('api.php?action=delete_account').then(() => location.reload()); });
+        }
+
+        function recoverPassword() {
+            const email = document.getElementById('f_email').value;
+            if(!email) return Swal.fire('Error', 'Please enter your email address', 'error');
+
+            fetch('api.php?action=recover_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    Swal.fire('Success', data.message, 'success');
+                    switchView('login');
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            });
         }
 
         // --- DATA & UI ---

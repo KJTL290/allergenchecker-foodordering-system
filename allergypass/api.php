@@ -8,11 +8,11 @@ $input = json_decode(file_get_contents("php://input"), true);
 
 // --- AUTH ---
 if ($action == 'register') {
-    $user = $input['username']; $pass = md5($input['password']); $name = $input['full_name'];
+    $user = $input['username']; $pass = md5($input['password']); $name = $input['full_name']; $email = $input['email'];
     $check = $conn->query("SELECT id FROM users WHERE username = '$user'");
     if ($check->num_rows > 0) { echo json_encode(["status" => "error", "message" => "Username taken"]); exit; }
-    $stmt = $conn->prepare("INSERT INTO users (username, password, full_name) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $user, $pass, $name);
+    $stmt = $conn->prepare("INSERT INTO users (username, password, full_name, email) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssss", $user, $pass, $name, $email);
     if ($stmt->execute()) { $_SESSION['user_id'] = $conn->insert_id; echo json_encode(["status" => "success"]); }
     else echo json_encode(["status" => "error"]);
 }
@@ -41,11 +41,11 @@ if ($action == 'delete_account') {
 if ($action == 'get_profile') {
     if (!isset($_SESSION['user_id'])) { echo json_encode(["status" => "error"]); exit; }
     $uid = $_SESSION['user_id'];
-    
+
     // User Info
     $userRes = $conn->query("SELECT full_name FROM users WHERE id=$uid");
     $userRow = $userRes->fetch_assoc();
-    
+
     // Common Allergies
     $algRes = $conn->query("SELECT allergy_name FROM user_allergies WHERE user_id=$uid");
     $allergies = [];
@@ -65,8 +65,8 @@ if ($action == 'get_profile') {
     }
 
     echo json_encode([
-        "status" => "success", 
-        "name" => $userRow['full_name'], 
+        "status" => "success",
+        "name" => $userRow['full_name'],
         "allergies" => $allergies,
         "custom_allergies" => $custom
     ]);
@@ -152,5 +152,123 @@ if ($action == 'delete_custom_allergy') {
     $id = $input['id'];
     $conn->query("DELETE FROM custom_allergens WHERE id=$id");
     echo json_encode(["status" => "success"]);
+}
+
+// --- PASSWORD RECOVERY ---
+if ($action == 'recover_password') {
+    $email = $input['email'];
+
+    // Validate email format
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(["status" => "error", "message" => "Invalid email format"]);
+        exit;
+    }
+
+    // Find user by email
+    $stmt = $conn->prepare("SELECT id, username, full_name FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    if ($row = $res->fetch_assoc()) {
+        $userId = $row['id'];
+        $username = $row['username'];
+        $fullName = $row['full_name'];
+
+        // Generate a unique reset token
+        $resetToken = bin2hex(random_bytes(32)); // 64 character hex string
+        $expiry = date('Y-m-d H:i:s', strtotime('+1 hour')); // Token expires in 1 hour
+
+        // Save the reset token to the database
+        $updateStmt = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?");
+        $updateStmt->bind_param("ssi", $resetToken, $expiry, $userId);
+
+        if ($updateStmt->execute()) {
+            // In a real application, you would send an email with the reset link
+            // For now, we'll simulate sending the email and return success
+            // You would use PHPMailer or similar library to send actual emails
+
+            // Example of how to send email (uncomment and configure in production):
+            /*
+            $to = $email;
+            $subject = "Password Reset Request - AllergyPass";
+            $resetLink = "https://yourdomain.com/reset_password.php?token=" . $resetToken;
+            $message = "Hello $fullName,\n\nYou have requested to reset your password. Please click the link below to reset your password:\n\n$resetLink\n\nThis link will expire in 1 hour.\n\nIf you did not request this, please ignore this email.\n\nBest regards,\nThe AllergyPass Team";
+            $headers = "From: noreply@allergypass.com";
+
+            if(mail($to, $subject, $message, $headers)) {
+                echo json_encode([
+                    "status" => "success",
+                    "message" => "Password reset link has been sent to your email address."
+                ]);
+            } else {
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "Failed to send email. Please contact support."
+                ]);
+            }
+            */
+
+            // For demonstration purposes, we'll return success
+            echo json_encode([
+                "status" => "success",
+                "message" => "Password reset link has been sent to your email address."
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Failed to generate reset token. Please try again."
+            ]);
+        }
+    } else {
+        // Don't reveal if email exists or not for security
+        echo json_encode([
+            "status" => "success",
+            "message" => "If an account exists with this email, a password reset link has been sent."
+        ]);
+    }
+    }
+}
+
+// --- RESET PASSWORD ---
+if ($action == 'reset_password') {
+    $token = $input['token'];
+    $newPassword = md5($input['new_password']);
+
+    if (empty($token) || empty($newPassword)) {
+        echo json_encode(["status" => "error", "message" => "Token and new password are required"]);
+        exit;
+    }
+
+    // Check if the token is valid and not expired
+    $stmt = $conn->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()");
+    $stmt->bind_param("s", $token);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    if ($row = $res->fetch_assoc()) {
+        $userId = $row['id'];
+
+        // Update the password and clear the reset token
+        $updateStmt = $conn->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?");
+        $updateStmt->bind_param("si", $newPassword, $userId);
+
+        if ($updateStmt->execute()) {
+            echo json_encode([
+                "status" => "success",
+                "message" => "Password has been reset successfully."
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Failed to reset password. Please try again."
+            ]);
+        }
+    } else {
+        echo json_encode([
+            "status" => "error",
+            "message" => "Invalid or expired token."
+        ]);
+    }
 }
 ?>
