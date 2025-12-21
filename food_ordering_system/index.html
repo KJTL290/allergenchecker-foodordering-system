@@ -80,6 +80,16 @@
             document.getElementById('selected-role').innerText = r.querySelector('h3').innerText;
         }));
 
+        // Preselect role when a query param is provided (e.g., ?view=kiosk)
+        (function(){
+            const params = new URLSearchParams(window.location.search);
+            const q = params.get('view') || params.get('role');
+            if(q) {
+                const el = document.getElementById('role-' + q);
+                if(el) el.click();
+            }
+        })();
+
         function showError(msg){ const e=document.getElementById('err'); e.innerText=msg||'Invalid credentials or unauthorized for selected role'; e.style.display='block'; setTimeout(()=>e.style.display='none',4000); }
 
         document.getElementById('btnLogin').addEventListener('click', login);
@@ -97,8 +107,8 @@
                 if(data.status==='success'){
                     if(currentApp==='operations') window.location.href='operations.html';
                     else if(currentApp==='kiosk') {
-                        // cashier -> open kiosk view inside dashboard
-                        window.location.href='dashboard.html?view=kiosk';
+                        // kiosk/cashier -> go to standalone kiosk page
+                        window.location.href='kiosk.html';
                     } else window.location.href='dashboard.html';
                 } else {
                     showError(data.message || 'Login failed');

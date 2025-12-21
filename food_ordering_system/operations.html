@@ -25,20 +25,9 @@
 </head>
 <body>
 
-<div id="login-lock-screen" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); z-index:10000;">
-    <div class="login-box">
-        <h2>Kitchen Login</h2>
-        <p style="color:#666; margin-bottom:12px;">Kitchen staff only</p>
-        <div style="margin-bottom:10px;"><input type="text" id="k_user_ops" placeholder="Username" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
-        <div style="margin-bottom:10px;"><input type="password" id="k_pass_ops" placeholder="Password" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
-        <div style="display:flex; gap:10px;">
-            <button onclick="performOpsLogin()" style="flex:1; padding:10px; border-radius:6px; background:#2196f3; color:white; border:none;">Sign In</button>
-        </div>
-        <div id="opsError" style="color:red; display:none; margin-top:10px;">Invalid Credentials</div>
-    </div>
-</div>
+<!-- Login is handled centrally via index.html — this page requires authentication and will redirect to the unified login if not authenticated -->
 
-<nav class="navbar"><div>🍽️ <strong>Operations - Kitchen</strong></div><div><button onclick="logout()" style="background:#c62828; color:white; border:none; padding:8px 12px; border-radius:6px;">Logout</button></div></nav>
+<nav class="navbar"><div>🍽️ <strong>Operations - Kitchen</strong></div><div><button onclick="activateMonitor()" style="background:#1976d2; color:white; border:none; padding:8px 12px; border-radius:6px; margin-right:8px;">View Monitor</button><button onclick="logout()" style="background:#c62828; color:white; border:none; padding:8px 12px; border-radius:6px;">Logout</button></div></nav>
 
 <div class="top">
     <div><strong>Incoming</strong> <span id="unpaid-count" style="background:#2196f3; color:white; padding:3px 8px; border-radius:8px; margin-left:8px;">0</span></div>
@@ -62,13 +51,9 @@
 </div>
 
 <script>
-function performOpsLogin(){
-    const u=document.getElementById('k_user_ops').value; const p=document.getElementById('k_pass_ops').value;
-    fetch('auth.php?action=login', { method:'POST', body: JSON.stringify({ username: u, password: p, app: 'operations' }) })
-    .then(res=>res.json()).then(data=>{ if(data.status==='success'){ document.getElementById('login-lock-screen').style.display='none'; initOps(); } else { document.getElementById('opsError').style.display='block'; } }).catch(()=>{ Swal.fire('Error','Connection failed','error'); });
-}
 
-function logout(){ fetch('auth.php?action=logout&app=operations').then(()=>{ location.href='operations.html'; }); }
+
+function logout(){ fetch('auth.php?action=logout&app=operations').then(()=>{ window.location.href='index.html?view=operations'; }); }
 
 let orders = [];
 function initOps(){ fetchOrders(); setInterval(fetchOrders,2000); }
@@ -79,11 +64,51 @@ function renderOrders(ordersList){ document.getElementById('pending-list').inner
 
 function updateStatus(id, status){ fetch('api.php?action=update_status', { method:'POST', body: JSON.stringify({ id: id, status: status }) }).then(()=>fetchOrders()); }
 
-function openStockModal(){ document.getElementById('stockModal').style.display='flex'; fetch('admin_api.php?action=get_all').then(res=>res.json()).then(data=>{ const list=document.getElementById('stock-list-container'); list.innerHTML=''; data.forEach(p=>{ const btnText = p.is_available==1? 'IN STOCK' : 'OUT'; const btnColor = p.is_available==1 ? '#4caf50' : '#f44336'; list.innerHTML += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><div><b>${p.name}</b><div style="font-size:0.9rem;color:#777;">(${p.category})</div></div><button onclick="toggleQuickStock(this, ${p.id}, ${p.is_available})" style="background:${btnColor};color:white;border:none;padding:6px;border-radius:6px;">${btnText}</button></div>`; }); }); }
+function openStockModal(){
+    document.getElementById('stockModal').style.display='flex';
+    const list=document.getElementById('stock-list-container');
+    list.innerHTML = '<div style="color:#777; text-align:center; padding:20px;">Loading...</div>';
+
+    Promise.all([
+        fetch('admin_api.php?action=get_categories').then(r=>r.json()),
+        fetch('admin_api.php?action=get_all').then(r=>r.json())
+    ]).then(([cats, data]) => {
+        list.innerHTML = '';
+        const catSet = new Set((Array.isArray(cats) ? cats : []).map(c => (c.name || '').toString()));
+        const filtered = (Array.isArray(data) ? data : []).filter(p => p && p.id && catSet.has((p.category||'').toString()));
+        if(filtered.length === 0) { list.innerHTML = '<div style="color:#777; text-align:center; padding:20px;">No menu products found.</div>'; return; }
+
+        // Deduplicate by id and sort by sort_order then name
+        const map = {};
+        filtered.forEach(p => { if(!p || !p.id) return; map[p.id] = p; });
+        const products = Object.values(map).sort((a,b) => {
+            const sa = (a.sort_order !== undefined && a.sort_order !== null) ? parseInt(a.sort_order) : 99999;
+            const sb = (b.sort_order !== undefined && b.sort_order !== null) ? parseInt(b.sort_order) : 99999;
+            if(sa !== sb) return sa - sb;
+            return (a.name||'').localeCompare(b.name||'');
+        });
+
+        products.forEach(p=>{
+            const btnText = p.is_available==1? 'IN STOCK' : 'OUT';
+            const btnColor = p.is_available==1 ? '#4caf50' : '#f44336';
+            const safeName = escapeHtml(p.name || 'Unnamed');
+            const safeCat = escapeHtml(p.category || 'Uncategorized');
+            list.innerHTML += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><div><b>${safeName}</b><div style="font-size:0.9rem;color:#777;">(${safeCat})</div></div><button onclick="toggleQuickStock(this, ${p.id}, ${p.is_available})" style="background:${btnColor};color:white;border:none;padding:6px;border-radius:6px;">${btnText}</button></div>`;
+        });
+    }).catch(()=>{ list.innerHTML = '<div style="color:#777; text-align:center; padding:20px;">Unable to fetch products.</div>'; });
+}
+
 function toggleQuickStock(btn, id, currentStatus){ const newStatus = currentStatus==1?0:1; const fd = new FormData(); fd.append('id', id); fd.append('status', newStatus); fetch('admin_api.php?action=toggle_stock', { method:'POST', body: fd }).then(()=>{ btn.style.background = newStatus==1? '#4caf50' : '#f44336'; btn.innerText = newStatus==1? 'IN STOCK' : 'OUT'; btn.onclick = function(){ toggleQuickStock(btn, id, newStatus); }; }); }
 
-// Check session on load
-fetch('auth.php?action=check_session&app=operations').then(res=>res.json()).then(data=>{ if(data.status === 'logged_in') { document.getElementById('login-lock-screen').style.display='none'; initOps(); } else { document.getElementById('login-lock-screen').style.display='flex'; } }).catch(()=>{ document.getElementById('login-lock-screen').style.display='flex'; });
+function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function activateMonitor() {
+    const win = window.open('monitor.html', '_blank');
+    if (win) win.focus(); else Swal.fire('Popup blocked', 'Please allow popups for this site to open the monitor in a new tab.', 'warning');
+}
+
+// Check session on load — redirect to unified login if not authenticated
+fetch('auth.php?action=check_session&app=operations').then(res=>res.json()).then(data=>{ if(data.status === 'logged_in') { initOps(); } else { window.location.href = 'index.html?view=operations'; } }).catch(()=>{ window.location.href = 'index.html?view=operations'; });
 
 </script>
 </body>

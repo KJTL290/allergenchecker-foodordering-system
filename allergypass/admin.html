@@ -115,7 +115,7 @@
                 <div class="add-form">
                     <input type="text" id="new-name" placeholder="Name (e.g. Sesame)">
                     <input type="text" id="new-icon" placeholder="Icon (e.g. 🥯)" style="max-width:80px;">
-                    <button class="btn-add" onclick="addItem()">+ Add</button>
+                    <button class="btn-add" onclick="openNew()">+ Add</button>
                 </div>
             </div>
         </div>
@@ -139,9 +139,13 @@
             <input type="text" id="edit_icon" class="main-input" placeholder="Icon" style="width:100px;">
             <p style="text-align:left; font-size:0.9rem; font-weight:bold; margin-bottom:5px;">Ingredients (Keywords)</p>
             <div class="chip-input-group">
-                <input type="text" id="chip_word" placeholder="Add ingredient (e.g. Milk)">
+                <input type="text" id="chip_word" placeholder="Add ingredient (e.g. Milk)" oninput="filterSuggestions(this.value)">
                 <button class="btn-add-chip" onclick="addChip()">Add</button>
             </div>
+            <div style="margin-bottom:8px; text-align:left; font-size:0.85rem; color:#666;">Only ingredients that appear in product recipes are allowed. Use the search below to find product ingredients.</div>
+            <div style="margin-bottom:8px; text-align:left; font-size:0.9rem; color:#666;">Search ingredients from products:</div>
+            <input type="text" id="ingredient-search" placeholder="Search ingredients..." style="width:100%; padding:8px; border:1px solid #eee; border-radius:6px; margin-bottom:8px;" oninput="filterSuggestions(this.value)">
+            <div id="suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
             <div class="chip-container" id="chipList"></div>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeModal()">Cancel</button>
@@ -152,6 +156,7 @@
 
     <script>
         let commonData = [], tempKeywords = [];
+        let allIngredients = [], existingKeywordsSet = {}; // fetched from products and current common keywords
 
         function togglePass(id) {
             const x = document.getElementById(id);
@@ -168,7 +173,7 @@
         }
 
         function logout() { fetch('admin_api.php?action=logout').then(() => location.reload()); }
-        function loadAllData() { loadStats(); loadCommon(); loadUsers(); }
+        function loadAllData() { loadStats(); loadCommon(); loadUsers(); fetchIngredients(); }
 
         function loadStats() {
             fetch('admin_api.php?action=get_stats').then(res=>res.json()).then(d => {
@@ -181,6 +186,10 @@
         function loadCommon() {
             fetch('admin_api.php?action=get_common').then(res=>res.json()).then(data => {
                 commonData = data;
+                // build existingKeywordsSet
+                existingKeywordsSet = {};
+                data.forEach(c => { if(c.keywords) c.keywords.forEach(w => existingKeywordsSet[w.toLowerCase().trim()] = true); });
+
                 const list = document.getElementById('common-list');
                 list.innerHTML = '';
                 data.forEach(item => {
@@ -189,6 +198,26 @@
                 });
             });
         }
+
+        function fetchIngredients() {
+            // get aggregated ingredients from food ordering system
+            fetch('../food_ordering_system/admin_api.php?action=get_ingredients').then(res => res.json()).then(data => { allIngredients = data || []; renderSuggestions([]); });
+        }
+
+        function filterSuggestions(q) {
+            const ql = (q||'').toLowerCase().trim();
+            if(ql === '') { renderSuggestions([]); return; }
+            const matches = allIngredients.filter(i => i.indexOf(ql) !== -1).slice(0,50);
+            renderSuggestions(matches);
+        }
+
+        function renderSuggestions(arr) {
+            const cont = document.getElementById('suggestions');
+            cont.innerHTML = '';
+            arr.forEach(a => { const btn = document.createElement('button'); btn.className='btn-add-chip'; btn.style.background='#eee'; btn.style.color='#333'; btn.style.border='none'; btn.style.padding='6px 10px'; btn.style.borderRadius='10px'; btn.style.cursor='pointer'; btn.innerText = a; btn.onclick = () => addSuggestion(a); cont.appendChild(btn); });
+        }
+
+        function addSuggestion(a) { document.getElementById('chip_word').value = a; addChip(); }
 
         function loadUsers() {
             fetch('admin_api.php?action=get_users').then(res=>res.json()).then(data => {
@@ -199,14 +228,7 @@
             });
         }
 
-        function addItem() {
-            const name = document.getElementById('new-name').value; const icon = document.getElementById('new-icon').value;
-            if(!name) return Swal.fire('Error', 'Name is required', 'error');
-            fetch('admin_api.php?action=add_common', { method:'POST', body:JSON.stringify({name, icon}) }).then(() => {
-                document.getElementById('new-name').value = ''; document.getElementById('new-icon').value = ''; loadCommon();
-                Swal.fire('Success', 'Item Added', 'success');
-            });
-        }
+        function addItem() { openNew(); }
 
         function deleteItem(id) { 
             Swal.fire({ title: 'Delete?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' })
@@ -222,15 +244,38 @@
             const item = commonData.find(c => c.id == id);
             if (!item) return Swal.fire('Error', 'Could not find data', 'error');
             document.getElementById('edit_id').value = item.id; document.getElementById('edit_name').value = item.name; document.getElementById('edit_icon').value = item.icon;
-            tempKeywords = item.keywords ? [...item.keywords] : []; renderChips(); document.getElementById('editModal').style.display = 'flex';
+            tempKeywords = item.keywords ? [...item.keywords] : []; renderChips(); document.getElementById('ingredient-search').value=''; renderSuggestions([]); document.getElementById('editModal').style.display = 'flex';
+        }
+        function openNew() {
+            document.getElementById('edit_id').value = ''; document.getElementById('edit_name').value = document.getElementById('new-name').value || '';
+            document.getElementById('edit_icon').value = document.getElementById('new-icon').value || '';
+            tempKeywords = [];
+            renderChips(); document.getElementById('ingredient-search').value=''; renderSuggestions([]); document.getElementById('editModal').style.display = 'flex';
         }
         function closeModal() { document.getElementById('editModal').style.display = 'none'; }
-        function addChip() { const val = document.getElementById('chip_word').value.trim(); if(val) { tempKeywords.push(val); renderChips(); document.getElementById('chip_word').value = ''; } }
+        function addChip() {
+            const val = document.getElementById('chip_word').value.trim(); if(!val) return;
+            // Admin may add any keyword (no restriction)
+            tempKeywords.push(val);
+            renderChips(); document.getElementById('chip_word').value = '';
+        }
         function removeChip(i) { tempKeywords.splice(i, 1); renderChips(); }
         function renderChips() { document.getElementById('chipList').innerHTML = tempKeywords.map((k, i) => `<div class="chip">${k} <span onclick="removeChip(${i})">×</span></div>`).join(''); }
+
         function saveEdit() {
             const id = document.getElementById('edit_id').value, name = document.getElementById('edit_name').value, icon = document.getElementById('edit_icon').value;
-            fetch('admin_api.php?action=update_common_allergy', { method: 'POST', body: JSON.stringify({ id, name, icon, keywords: tempKeywords }) }).then(() => { closeModal(); loadCommon(); Swal.fire('Saved!', '', 'success'); });
+            if(!name) return Swal.fire('Error', 'Name is required', 'error');
+            // Admin may save any keywords without product-ingredient restriction
+            // No additional client-side validation for admin keywords
+            
+
+            if(id) {
+                fetch('admin_api.php?action=update_common_allergy', { method: 'POST', body: JSON.stringify({ id, name, icon, keywords: tempKeywords }) })
+                .then(res => res.json()).then(r => { if(r.status === 'success') { closeModal(); loadCommon(); Swal.fire('Saved!', '', 'success'); } else Swal.fire('Error', r.message || 'Save failed', 'error'); });
+            } else {
+                fetch('admin_api.php?action=add_common', { method: 'POST', body: JSON.stringify({ name, icon, keywords: tempKeywords }) })
+                .then(res => res.json()).then(r => { if(r.status === 'success') { closeModal(); loadCommon(); document.getElementById('new-name').value=''; document.getElementById('new-icon').value=''; Swal.fire('Added!', '', 'success'); } else Swal.fire('Error', r.message || 'Add failed', 'error'); });
+            }
         }
 
         function switchTab(tab) {

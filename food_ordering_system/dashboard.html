@@ -106,7 +106,6 @@
             <button class="nav-tab" id="tab-kiosk" style="display:none;" onclick="switchTab('kiosk')">Kiosk</button>
         </div>
         <div class="nav-actions">
-            <button class="btn-kiosk" onclick="window.location.href='kiosk.html'"><span>🚀</span><span class="btn-text">Launch Kiosk</span></button>
             <button onclick="logout()" style="background:#555; border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Logout">⏻</button>
         </div>
     </nav>
@@ -207,7 +206,7 @@
 
     <script>
         fetch('auth.php?action=check_session&app=admin').then(res => res.json()).then(data => {
-            if (data.status === 'logged_out') window.location.href = 'login.html';
+            if (data.status === 'logged_out') window.location.href = 'index.html';
             else {
                 const role = data.role;
                 // Hide kiosk tab by default
@@ -229,7 +228,7 @@
                 }
             }
         });
-        function logout() { fetch('auth.php?action=logout&app=admin').then(() => { window.location.href = 'login.html'; }); }
+        function logout() { fetch('auth.php?action=logout&app=admin').then(() => { window.location.href = 'index.html'; }); }
 
         let allProducts=[], allCategories=[], currentCategoryFilter='', currentHistoryData=[], historyFilterStatus='all', salesChart=null;
 

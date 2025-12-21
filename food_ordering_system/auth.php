@@ -20,13 +20,15 @@ if ($action == 'login') {
     if ($row = $result->fetch_assoc()) {
         // STORE IN SEPARATE SESSIONS (do role checks per app)
         if ($appType === 'kiosk') {
-            if ($row['role'] !== 'cashier') { echo json_encode(['status'=>'error','message'=>'Unauthorized for kiosk']); exit; }
+            // allow either 'cashier' or legacy 'kiosk' role names
+            if (!in_array($row['role'], ['cashier','kiosk'])) { echo json_encode(['status'=>'error','message'=>'Unauthorized for kiosk']); exit; }
             $_SESSION['kiosk_session'] = ['id' => $row['id'], 'role' => $row['role']];
         } elseif ($appType === 'operations') {
-            if ($row['role'] !== 'kitchen') { echo json_encode(['status'=>'error','message'=>'Unauthorized for operations']); exit; }
+            // allow 'kitchen' or 'operations' role names
+            if (!in_array($row['role'], ['kitchen','operations'])) { echo json_encode(['status'=>'error','message'=>'Unauthorized for operations']); exit; }
             $_SESSION['ops_session'] = ['id' => $row['id'], 'role' => $row['role']];
         } else {
-            // admin app - only admin role allowed
+            // admin app - allow 'admin' role
             if ($row['role'] !== 'admin') { echo json_encode(['status'=>'error','message'=>'Unauthorized for admin']); exit; }
             $_SESSION['admin_session'] = ['id' => $row['id'], 'role' => $row['role']];
         }

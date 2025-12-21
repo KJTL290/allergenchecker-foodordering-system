@@ -72,13 +72,63 @@ if ($action == 'get_common') {
     echo json_encode($data);
 }
 
-// 2. Add New
+// Helper to get unique ingredients from food ordering products
+function get_product_ingredients($conn) {
+    $res = $conn->query("SELECT ingredients FROM products WHERE ingredients IS NOT NULL AND ingredients != ''");
+    $set = [];
+    while($row = $res->fetch_assoc()) {
+        $parts = preg_split('/[,;\/\\|]+/', $row['ingredients']);
+        foreach($parts as $p) {
+            $w = trim(strtolower($p));
+            if($w !== '') $set[$w] = true;
+        }
+    }
+    return array_keys($set);
+}
+
+// Helper to get all existing common keywords (for exception)
+function get_existing_common_keywords($conn) {
+    $res = $conn->query("SELECT word FROM common_keywords");
+    $set = [];
+    while($r = $res->fetch_assoc()) $set[strtolower(trim($r['word']))] = true;
+    return $set;
+}
+
+// Helper to check keyword allowed by substring match
+function is_allowed_keyword($kw, $allowedList) {
+    $lk = strtolower(trim($kw));
+    if($lk === '') return false;
+    foreach($allowedList as $a) {
+        $a = strtolower($a);
+        if($a === '') continue;
+        if(strpos($a, $lk) !== false || strpos($lk, $a) !== false) return true;
+    }
+    return false;
+}
+
+// 2. Add New (supports optional keywords)
 if ($action == 'add_common') {
     $name = $input['name'];
     $icon = $input['icon'];
+    $keywords = $input['keywords'] ?? [];
+
+
+
     $stmt = $conn->prepare("INSERT INTO common_allergens (name, icon) VALUES (?, ?)");
     $stmt->bind_param("ss", $name, $icon);
-    echo $stmt->execute() ? json_encode(["status" => "success"]) : json_encode(["status" => "error"]);
+    if($stmt->execute()) {
+        $newId = $conn->insert_id;
+        if(is_array($keywords) && count($keywords) > 0) {
+            $kStmt = $conn->prepare("INSERT INTO common_keywords (common_allergen_id, word) VALUES (?, ?)");
+            foreach($keywords as $w) {
+                $kw = trim($w);
+                if($kw === '') continue;
+                $kStmt->bind_param("is", $newId, $kw);
+                $kStmt->execute();
+            }
+        }
+        echo json_encode(["status" => "success"]);
+    } else echo json_encode(["status" => "error"]);
 }
 
 // 3. Update (Name, Icon, Ingredients)
@@ -86,7 +136,9 @@ if ($action == 'update_common_allergy') {
     $id = $input['id'];
     $name = $input['name'];
     $icon = $input['icon'];
-    $words = $input['keywords']; // Array
+    $words = $input['keywords'] ?? []; // Array
+
+
 
     $stmt = $conn->prepare("UPDATE common_allergens SET name=?, icon=? WHERE id=?");
     $stmt->bind_param("ssi", $name, $icon, $id);
@@ -96,7 +148,9 @@ if ($action == 'update_common_allergy') {
         $conn->query("DELETE FROM common_keywords WHERE common_allergen_id=$id");
         $kStmt = $conn->prepare("INSERT INTO common_keywords (common_allergen_id, word) VALUES (?, ?)");
         foreach($words as $w) {
-            $kStmt->bind_param("is", $id, $w);
+            $kw = trim($w);
+            if($kw === '') continue;
+            $kStmt->bind_param("is", $id, $kw);
             $kStmt->execute();
         }
         echo json_encode(["status" => "success"]);

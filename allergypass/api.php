@@ -3,6 +3,19 @@ session_start();
 include 'db_connect.php';
 header('Content-Type: application/json');
 
+// Prevent PHP warnings/notices from being printed into JSON responses
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+
+// Register shutdown handler to capture fatal errors and log them
+register_shutdown_function(function() {
+    $err = error_get_last();
+    if ($err) {
+        $msg = date('c') . " SHUTDOWN_ERROR type={$err['type']} file={$err['file']} line={$err['line']} message=" . str_replace("\n", " ", $err['message']) . "\n";
+        file_put_contents(__DIR__ . '/debug_allergy.log', $msg, FILE_APPEND);
+    }
+});
+
 // Set timezone to UTC or your local timezone to ensure consistency
 date_default_timezone_set('UTC'); // Change to your local timezone if needed, e.g., 'America/New_York'
 
@@ -49,7 +62,14 @@ if ($action == 'login') {
     $user = $input['username'];
     $pass = md5($input['password']);
 
+    file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " LOGIN_ATTEMPT user=" . json_encode($user) . "\n", FILE_APPEND);
+
     $stmt = $conn->prepare("SELECT id, full_name FROM users WHERE username=? AND password=?");
+    if (!$stmt) {
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " LOGIN_PREPARE_FAILED=" . json_encode($conn->error) . "\n", FILE_APPEND);
+        echo json_encode(["status" => "error", "message" => "Server error" ]);
+        exit;
+    }
     $stmt->bind_param("ss", $user, $pass);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -61,23 +81,48 @@ if ($action == 'login') {
         }
 
         $_SESSION['user_id'] = $row['id'];
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " LOGIN_SUCCESS id=" . $row['id'] . "\n", FILE_APPEND);
         echo json_encode(["status" => "success"]);
     } else {
         // For debugging - check if user exists but password is wrong
         $checkUser = $conn->prepare("SELECT id FROM users WHERE username=?");
+        if (!$checkUser) {
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " LOGIN_CHECKUSER_PREPARE_FAILED=" . json_encode($conn->error) . "\n", FILE_APPEND);
+            echo json_encode(["status" => "error", "message" => "Server error" ]);
+            exit;
+        }
         $checkUser->bind_param("s", $user);
         $checkUser->execute();
         $userResult = $checkUser->get_result();
 
         if ($userResult->num_rows > 0) {
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " LOGIN_INCORRECT_PW user=" . json_encode($user) . "\n", FILE_APPEND);
             echo json_encode(["status" => "error", "message" => "Incorrect password"]);
         } else {
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " LOGIN_INVALID_USER user=" . json_encode($user) . "\n", FILE_APPEND);
             echo json_encode(["status" => "error", "message" => "Invalid credentials"]);
         }
     }
 }
 
 if ($action == 'logout') { session_destroy(); echo json_encode(["status" => "success"]); }
+
+if ($action == 'check_session') {
+    if (isset($_SESSION['user_id'])) {
+        $uid = $_SESSION['user_id'];
+        $stmt = $conn->prepare("SELECT id, full_name FROM users WHERE id = ?");
+        $stmt->bind_param("i", $uid);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($row = $res->fetch_assoc()) {
+            echo json_encode(["status" => "logged_in", "user_id" => $row['id'], "full_name" => $row['full_name']]);
+        } else {
+            echo json_encode(["status" => "logged_out"]);
+        }
+    } else {
+        echo json_encode(["status" => "logged_out"]);
+    }
+}
 
 if ($action == 'delete_account') {
     if (!isset($_SESSION['user_id'])) exit;
@@ -149,59 +194,310 @@ if ($action == 'save_profile') {
 
 // --- CUSTOM ALLERGY CRUD ---
 
+// Helper: get normalized product ingredients
+function get_product_ingredients($conn) {
+    $set = [];
+    file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " GET_PROD_ING_START\n", FILE_APPEND);
+
+    // Try local DB first (works if products table exists in same DB)
+    $res = @$conn->query("SELECT ingredients FROM products WHERE ingredients IS NOT NULL AND ingredients != ''");
+    if ($res !== false) {
+        while($row = $res->fetch_assoc()) {
+            $parts = preg_split('/[,;\/\\|]+/', $row['ingredients']);
+            foreach($parts as $p) {
+                $w = trim(strtolower($p));
+                if($w !== '') $set[$w] = true;
+            }
+        }
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " GET_PROD_ING_DONE local_count=" . count($set) . "\n", FILE_APPEND);
+        return array_keys($set);
+    }
+
+    // Local query failed (products table might not exist in this DB). Try fallback to food ordering system endpoint.
+    file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " GET_PROD_ING_LOCAL_FAILED\n", FILE_APPEND);
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $url = $scheme . '://' . $host . '/food_ordering_system/admin_api.php?action=get_ingredients';
+
+    $ctx = stream_context_create(['http' => ['timeout' => 2]]);
+    $body = @file_get_contents($url, false, $ctx);
+    if ($body) {
+        $data = json_decode($body, true);
+        if (is_array($data)) {
+            foreach($data as $p) {
+                $w = trim(strtolower($p));
+                if($w !== '') $set[$w] = true;
+            }
+        }
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " GET_PROD_ING_DONE remote_count=" . count($set) . "\n", FILE_APPEND);
+    } else {
+        // Log fallback failure for diagnostics
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " FALLBACK_FETCH_FAILED url={$url}\n", FILE_APPEND);
+    }
+
+    return array_keys($set);
+}
+
+function is_allowed_keyword($kw, $allowedList) {
+    $lk = strtolower(trim($kw));
+    if($lk === '') return false;
+    foreach($allowedList as $a) {
+        $a = strtolower($a);
+        if($a === '') continue;
+        if(strpos($a, $lk) !== false || strpos($lk, $a) !== false) return true;
+    }
+    return false;
+}
+
 // Add
 if ($action == 'add_custom_allergy') {
-    if (!isset($_SESSION['user_id'])) exit;
+    // Capture any unexpected output to ensure we always return valid JSON
+    ob_start();
+
+    if (!isset($_SESSION['user_id'])) { ob_end_clean(); echo json_encode(["status" => "error", "message" => "Session expired" ]); exit; }
     $uid = $_SESSION['user_id'];
     $name = $input['name'];
-    $words = $input['keywords'];
+    $words = isset($input['keywords']) && is_array($input['keywords']) ? $input['keywords'] : [];
+
+    // Debug log the incoming request to help diagnose failures
+    file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " ADD_REQUEST uid={$uid} name=" . json_encode($name) . " keywords=" . json_encode($words) . "\n", FILE_APPEND);
+
+    // TRACE: about to call get_product_ingredients
+    file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " CALLING_GET_PRODUCT_ING\n", FILE_APPEND);
+    // Validate keywords: must exist in product ingredients
+    $validation_skipped = false;
+    try {
+        $allowedList = get_product_ingredients($conn);
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " ALLOWED_COUNT=" . count($allowedList) . "\n", FILE_APPEND);
+    } catch (Throwable $e) {
+        // Log the original exception and attempt HTTP fallback directly
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " GET_PROD_ING_EXCEPTION=" . json_encode([$e->getMessage()]) . "\n", FILE_APPEND);
+        // Try fallback remote fetch directly
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $url = $scheme . '://' . $host . '/food_ordering_system/admin_api.php?action=get_ingredients';
+        $ctx = stream_context_create(['http' => ['timeout' => 2]]);
+        $body = @file_get_contents($url, false, $ctx);
+        if ($body) {
+            $data = json_decode($body, true);
+            if (is_array($data)) {
+                $allowedList = array_map('strtolower', array_map('trim', $data));
+            }
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " FALLBACK_REMOTE_COUNT=" . count($allowedList) . "\n", FILE_APPEND);
+        } else {
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " FALLBACK_FETCH_FAILED url={$url}\n", FILE_APPEND);
+            // If no ingredient source is available, skip strict validation to avoid blocking users
+            $allowedList = [];
+            $validation_skipped = true;
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " VALIDATION_SKIPPED\n", FILE_APPEND);
+        }
+    }
+
+    if(count($allowedList) === 0 && !$validation_skipped) {
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"No product ingredients found; cannot create custom categories.", "debug_output" => $extra ]);
+        exit;
+    }
+    $invalid = [];
+    if (!$validation_skipped) {
+        foreach($words as $w) {
+            if(!is_allowed_keyword($w, $allowedList)) $invalid[] = $w;
+        }
+        if(count($invalid) > 0) {
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " INVALID=" . json_encode($invalid) . "\n", FILE_APPEND);
+            $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+            echo json_encode(["status"=>"error", "message"=>"Invalid ingredient(s): " . implode(', ', $invalid), "debug_output" => $extra ]);
+            exit;
+        }
+    }
+
+    // If validation was skipped due to missing ingredient source, add a warning but continue
+    $warning = null;
+    if ($validation_skipped) {
+        $warning = 'Ingredient validation skipped — ingredient source unavailable. Category saved without strict validation.';
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " WARNING_VALIDATION_SKIPPED\n", FILE_APPEND);
+    }
 
     $stmt = $conn->prepare("INSERT INTO custom_allergens (user_id, name) VALUES (?, ?)");
-    $stmt->bind_param("is", $uid, $name);
+    if(!$stmt) {
+        $err = $conn->error;
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " PREPARE_INSERT_FAILED=" . json_encode($err) . "\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"Prepare failed: " . $err, "debug_output" => $extra]);
+        exit;
+    }
+    if(!$stmt->bind_param("is", $uid, $name)) {
+        $err = $stmt->error;
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " BIND_INSERT_FAILED=" . json_encode($err) . "\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"Bind failed: " . $err, "debug_output" => $extra]);
+        exit;
+    }
     if($stmt->execute()) {
         $cid = $conn->insert_id;
         $kStmt = $conn->prepare("INSERT INTO custom_keywords (custom_allergen_id, word) VALUES (?, ?)");
-        foreach($words as $w) {
-            $kStmt->bind_param("is", $cid, $w);
-            $kStmt->execute();
+        if(!$kStmt) {
+            $err = $conn->error;
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " PREPARE_KEYWORD_FAILED=" . json_encode($err) . "\n", FILE_APPEND);
+            $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+            echo json_encode(["status"=>"error", "message"=>"Prepare keyword failed: " . $err, "debug_output" => $extra]);
+            exit;
         }
-        echo json_encode(["status" => "success"]);
+        foreach($words as $w) {
+            if(!$kStmt->bind_param("is", $cid, $w)) {
+                $err = $kStmt->error;
+                file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " BIND_KEYWORD_FAILED=" . json_encode([$w,$err]) . "\n", FILE_APPEND);
+                $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+                echo json_encode(["status"=>"error", "message"=>"Bind keyword failed: " . $err, "debug_output" => $extra]);
+                exit;
+            }
+            if(!$kStmt->execute()) {
+                // return keyword insert error
+                file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " KEYWORD_INSERT_ERROR=" . json_encode([$w, $kStmt->error]) . "\n", FILE_APPEND);
+                $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+                echo json_encode(["status" => "error", "message" => "Keyword insert failed: " . $kStmt->error, "debug_output" => $extra]);
+                exit;
+            }
+        }
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " ADD_SUCCESS cid={$cid}\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        $response = ["status" => "success", "debug_output" => $extra];
+        echo json_encode($response);
     } else {
-        echo json_encode(["status" => "error"]);
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " INSERT_ERROR=" . json_encode($stmt->error) . "\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status" => "error", "message" => "Insert failed: " . $stmt->error, "debug_output" => $extra]);
     }
 }
 
 // Update (The Logic to Prevent Duplication)
 if ($action == 'update_custom_allergy') {
-    if (!isset($_SESSION['user_id'])) exit;
+    // Capture any unexpected output
+    ob_start();
+
+    if (!isset($_SESSION['user_id'])) { ob_end_clean(); echo json_encode(["status" => "error", "message" => "Session expired" ]); exit; }
     $id = $input['id'];
     $name = $input['name'];
-    $words = $input['keywords'];
+    $words = isset($input['keywords']) && is_array($input['keywords']) ? $input['keywords'] : [];
+
+    // Debug logging
+    file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " UPDATE_REQUEST id={$id} name=" . json_encode($name) . " keywords=" . json_encode($words) . "\n", FILE_APPEND);
+
+    // Validate keywords: must exist in product ingredients, with graceful fallback
+    $validation_skipped = false;
+    try {
+        $allowedList = get_product_ingredients($conn);
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " ALLOWED_COUNT=" . count($allowedList) . "\n", FILE_APPEND);
+    } catch (Throwable $e) {
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " GET_PROD_ING_EXCEPTION=" . json_encode([$e->getMessage()]) . "\n", FILE_APPEND);
+        // fallback remote fetch
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $url = $scheme . '://' . $host . '/food_ordering_system/admin_api.php?action=get_ingredients';
+        $ctx = stream_context_create(['http' => ['timeout' => 2]]);
+        $body = @file_get_contents($url, false, $ctx);
+        if ($body) {
+            $data = json_decode($body, true);
+            if (is_array($data)) {
+                $allowedList = array_map('strtolower', array_map('trim', $data));
+            }
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " FALLBACK_REMOTE_COUNT=" . count($allowedList) . "\n", FILE_APPEND);
+        } else {
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " FALLBACK_FETCH_FAILED url={$url}\n", FILE_APPEND);
+            $allowedList = [];
+            $validation_skipped = true;
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " VALIDATION_SKIPPED\n", FILE_APPEND);
+        }
+    }
+
+    if(count($allowedList) === 0 && !$validation_skipped) {
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"No product ingredients found; cannot update custom categories.", "debug_output" => $extra ]);
+        exit;
+    }
+    $invalid = [];
+    foreach($words as $w) {
+        if(!$validation_skipped && !is_allowed_keyword($w, $allowedList)) $invalid[] = $w;
+    }
+    if(count($invalid) > 0) {
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " INVALID=" . json_encode($invalid) . "\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"Invalid ingredient(s): " . implode(', ', $invalid), "debug_output" => $extra ]);
+        exit;
+    }
+
+    $warning = null;
+    if ($validation_skipped) {
+        $warning = 'Ingredient validation skipped — ingredient source unavailable. Category saved without strict validation.';
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " WARNING_VALIDATION_SKIPPED\n", FILE_APPEND);
+    }
 
     $stmt = $conn->prepare("UPDATE custom_allergens SET name=? WHERE id=?");
-    $stmt->bind_param("si", $name, $id);
+    if(!$stmt) {
+        $err = $conn->error;
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " PREPARE_UPDATE_FAILED=" . json_encode($err) . "\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"Prepare failed: " . $err, "debug_output" => $extra]);
+        exit;
+    }
+    if(!$stmt->bind_param("si", $name, $id)) {
+        $err = $stmt->error;
+        file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " BIND_UPDATE_FAILED=" . json_encode($err) . "\n", FILE_APPEND);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status"=>"error", "message"=>"Bind failed: " . $err, "debug_output" => $extra]);
+        exit;
+    }
     
     if($stmt->execute()) {
         // Delete old keywords
         $conn->query("DELETE FROM custom_keywords WHERE custom_allergen_id=$id");
         // Insert new ones
         $kStmt = $conn->prepare("INSERT INTO custom_keywords (custom_allergen_id, word) VALUES (?, ?)");
-        foreach($words as $w) {
-            $kStmt->bind_param("is", $id, $w);
-            $kStmt->execute();
+        if(!$kStmt) {
+            $err = $conn->error;
+            file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " PREPARE_KEYWORD_FAILED=" . json_encode($err) . "\n", FILE_APPEND);
+            $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+            echo json_encode(["status"=>"error", "message"=>"Prepare keyword failed: " . $err, "debug_output" => $extra]);
+            exit;
         }
-        echo json_encode(["status" => "success"]);
+        foreach($words as $w) {
+            if(!$kStmt->bind_param("is", $id, $w)) {
+                $err = $kStmt->error;
+                file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " BIND_KEYWORD_FAILED=" . json_encode([$w,$err]) . "\n", FILE_APPEND);
+                $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+                echo json_encode(["status"=>"error", "message"=>"Bind keyword failed: " . $err, "debug_output" => $extra]);
+                exit;
+            }
+            if(!$kStmt->execute()) {
+                echo json_encode(["status" => "error", "message" => "Keyword insert failed: " . $kStmt->error]);
+                exit;
+            }
+        }
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        $resp = ["status" => "success", "debug_output" => $extra];
+        echo json_encode($resp);
     } else {
-        echo json_encode(["status" => "error"]);
+        $extra = trim(ob_get_clean()); if($extra) file_put_contents(__DIR__ . '/debug_allergy.log', date('c') . " EXTRA_OUTPUT=" . substr($extra,0,1000) . "\n", FILE_APPEND);
+        echo json_encode(["status" => "error", "message" => "Update failed: " . $stmt->error, "debug_output" => $extra]);
     }
 }
 
 // Delete
 if ($action == 'delete_custom_allergy') {
-    if (!isset($_SESSION['user_id'])) exit;
+    if (!isset($_SESSION['user_id'])) { echo json_encode(["status" => "error", "message" => "Session expired" ]); exit; }
     $id = $input['id'];
     $conn->query("DELETE FROM custom_allergens WHERE id=$id");
     echo json_encode(["status" => "success"]);
+}
+
+// --- DEBUG: return recent debug log (safe for local dev only) ---
+if ($action == 'get_debug_log') {
+    $path = __DIR__ . '/debug_allergy.log';
+    if (!file_exists($path)) { echo json_encode(["status"=>"error","message"=>"No debug log found"]); exit; }
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $last = array_slice($lines, -200);
+    echo json_encode(["status"=>"success","lines"=>array_values($last)]);
+    exit;
 }
 
 // --- PASSWORD RECOVERY ---

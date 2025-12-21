@@ -62,54 +62,14 @@
     <div class="login-card">
         <span class="brand-icon">🍔</span>
         <div class="brand-text">Login</div>
-        
-        <div class="error" id="errorMsg">Incorrect Username or Password</div>
-        
-        <div class="form-group">
-            <label>Username</label>
-            <input type="text" id="username" placeholder="Enter username">
-        </div>
-        <div class="form-group">
-            <label>Password</label>
-            <div class="password-wrap">
-                <input type="password" id="password" placeholder="Enter password">
-                <button class="toggle-btn" onclick="togglePass('password')">🔍</button>
-            </div>
-        </div>
-        <button class="login-btn" onclick="login()">Sign In</button>
+        <div style="color:#777; font-size:0.95rem; margin-bottom:10px;">This page is deprecated — use <a href="index.html">Home</a> to sign in.</div>
+        <button class="login-btn" onclick="gotoIndex()">Go to Home</button>
     </div>
 
     <script>
-        function togglePass(id) {
-            const x = document.getElementById(id);
-            x.type = x.type === "password" ? "text" : "password";
-        }
-
-        document.getElementById('password').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') login();
-        });
-
-        function login() {
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            
-            fetch('auth.php?action=login', {
-                method: 'POST',
-                body: JSON.stringify({ username: user, password: pass })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'success') {
-                    // Redirect to appropriate view based on role
-                    if(data.role === 'kitchen') window.location.href = 'dashboard.html?view=operations';
-                    else if(data.role === 'cashier') window.location.href = 'dashboard.html?view=kiosk';
-                    else window.location.href = 'dashboard.html';
-                } else {
-                    document.getElementById('errorMsg').style.display = 'block';
-                }
-            })
-            .catch(() => alert("Cannot connect to server"));
-        }
+        function gotoIndex() { window.location.href = 'index.html'; }
+        // For safety, also auto-redirect after a short pause
+        setTimeout(gotoIndex, 600);
     </script>
 </body>
 </html>

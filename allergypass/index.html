@@ -171,6 +171,7 @@
             </div>
             <button class="btn btn-primary" onclick="downloadQR()">⬇ Download Image</button>
             <button class="btn btn-secondary" onclick="switchView('dashboard')">Edit Profile</button>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
         </div>
     </div>
 
@@ -183,6 +184,7 @@
                 <input type="text" id="c_word" placeholder="Ingredient (e.g. Tomato)">
                 <button class="btn-add-chip" onclick="addChip()">Add</button>
             </div>
+            <div style="font-size:0.85rem; color:#666; text-align:left; margin-bottom:8px;">Only ingredients used in menu items can be added here to prevents free-text entries.</div>
             <div class="chip-container" id="chipList"></div>
             <button class="btn btn-primary" onclick="submitCustomAllergy()">Save Category</button>
             <button class="btn btn-secondary" style="margin-top:5px;" onclick="closeModal()">Cancel</button>
@@ -195,6 +197,15 @@
         let customAllergens = [];
         let currentUser = {};
         let tempKeywords = [];
+        let allIngredients = []; // normalized list of available product ingredients (fetched)
+
+        // Fetch aggregated ingredient list from food ordering system
+        function fetchIngredients() {
+            fetch('../food_ordering_system/admin_api.php?action=get_ingredients')
+            .then(res => res.json())
+            .then(data => { allIngredients = data || []; })
+            .catch(() => { allIngredients = []; });
+        }
 
         function togglePass(id) {
             const x = document.getElementById(id);
@@ -282,6 +293,9 @@
                 grid.innerHTML += `<div class="allergen-btn" id="btn-${alg.name}" onclick="toggleCommon('${alg.name}')">${alg.icon} ${alg.name}</div>`;
             });
 
+            // Fetch product ingredients for client-side validation
+            fetchIngredients();
+
             fetch('api.php?action=get_profile').then(res=>res.json()).then(d => {
                 if(d.status === 'success') {
                     currentUser = d;
@@ -359,7 +373,17 @@
         function closeModal() { document.getElementById('editorModal').style.display = 'none'; }
         function addChip() {
             const val = document.getElementById('c_word').value.trim();
-            if(val) { tempKeywords.push(val); renderChips(); document.getElementById('c_word').value = ''; }
+            if(!val) return;
+            // If no product ingredients are loaded, allow adding but warn the user that validation may be skipped
+            if(!allIngredients || allIngredients.length === 0) {
+                tempKeywords.push(val); renderChips(); document.getElementById('c_word').value = '';
+                return Swal.fire({icon:'info', title:'Note', text:'Product ingredients are unavailable – validation may be skipped on save.', showConfirmButton:false, timer:1500});
+            }
+            const lk = val.toLowerCase();
+            // allow if any ingredient contains the keyword or vice versa
+            const ok = allIngredients.some(a => { a = a.toLowerCase(); return a.indexOf(lk) !== -1 || lk.indexOf(a) !== -1; });
+            if(!ok) { return Swal.fire('Invalid', `"${val}" is not found in product ingredients in the menu, so no need to worry if you're allergic to that.`, 'warning'); }
+            tempKeywords.push(val); renderChips(); document.getElementById('c_word').value = '';
         }
         function removeChip(index) { tempKeywords.splice(index, 1); renderChips(); }
         function renderChips() {
@@ -371,12 +395,46 @@
             const idVal = document.getElementById('edit_id').value;
             const name = document.getElementById('c_name').value;
             if(!name || tempKeywords.length === 0) return Swal.fire('Warning', 'Please add name and ingredients', 'warning');
-            const action = (idVal && idVal !== "") ? 'update_custom_allergy' : 'add_custom_allergy';
-            const body = { name: name, keywords: tempKeywords };
-            if(idVal) body.id = idVal;
-            fetch('api.php?action='+action, { method: 'POST', body: JSON.stringify(body) })
-            .then(() => { closeModal(); loadProfile('editor'); Swal.fire({icon: 'success', title: 'Saved', showConfirmButton: false, timer: 1000}); });
+
+            const doSubmit = () => {
+                // client-side strict validation (only when product ingredients are available)
+                if(allIngredients && allIngredients.length > 0) {
+                    const invalid = [];
+                    tempKeywords.forEach(k => { const lk = k.toLowerCase().trim(); if(lk === '') return; const ok = allIngredients.some(a => { a = a.toLowerCase(); return a.indexOf(lk) !== -1 || lk.indexOf(a) !== -1; }); if(!ok) invalid.push(k); });
+                    if(invalid.length > 0) return Swal.fire('Error', 'Invalid ingredient(s): ' + invalid.join(', '), 'error');
+                }
+
+                const action = (idVal && idVal !== "") ? 'update_custom_allergy' : 'add_custom_allergy';
+                const body = { name: name, keywords: tempKeywords };
+                if(idVal) body.id = idVal;
+                fetch('api.php?action='+action, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
+                .then(res => res.text())
+                .then(text => {
+                    let r = {};
+                    try { r = JSON.parse(text); } catch(e) { console.error('Non-JSON response:', text); // show raw response for debugging
+                        const short = (text||'').slice(0,1500);
+                        Swal.fire({icon:'error', title:'Save failed', html: '<div style="text-align:left; max-height:200px; overflow:auto; white-space:pre-wrap;">'+escapeHtml(short)+'</div><br><small>Fetching server debug log...</small>'});
+                        // attempt to fetch server-side debug log
+                        fetch('api.php?action=get_debug_log').then(r=>r.json()).then(d=>{ if(d.status==='success') console.log('DEBUG LOG', d.lines); else console.log('No debug log'); }).catch(()=>{});
+                        return; }
+                    console.log('ADD_CUSTOM_RESPONSE', r);
+                if(r.status === 'success') { closeModal(); loadProfile('editor'); Swal.fire({icon: 'success', title: 'Saved', showConfirmButton: false, timer: 1000}); }
+                    else Swal.fire('Error', r.message || ('Save failed: ' + (text || 'no details')), 'error');
+                })
+                .catch(err => { console.error('Fetch error', err); Swal.fire('Error', 'Save failed: network error', 'error'); });
+            };
+
+            if(!allIngredients || allIngredients.length === 0) {
+                Swal.fire({title:'No product ingredients', text:'Ingredient validation is unavailable — saving will skip strict validation. Do you want to continue?', icon:'warning', showCancelButton:true, confirmButtonText:'Yes, save anyway'}).then(r=>{ if(r.isConfirmed) doSubmit(); });
+                return;
+            }
+
+            // otherwise proceed normally
+            doSubmit();
         }
+
+        // small helper to safely escape HTML when injecting into Swal
+        function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
         function deleteCustom(id) {
             Swal.fire({title: 'Delete this rule?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete it!'})
@@ -394,9 +452,12 @@
             const qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = "";
             const qrData = { name: currentUser.name, allergies: currentUser.allergies, custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords})) };
-            setTimeout(() => {
+            // Generate QR immediately and ensure any previous QR is removed to avoid duplicates
+            try {
                 new QRCode(qrContainer, { text: JSON.stringify(qrData), width: 180, height: 180, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.M });
-            }, 300);
+            } catch (e) {
+                console.error('QR generation failed', e);
+            }
         }
 
         function downloadQR() {
@@ -421,6 +482,19 @@
             document.querySelectorAll('.body').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + viewName).classList.add('active');
         }
+
+        // On page load: check if user session exists and fetch ingredient list early
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('api.php?action=check_session').then(res => res.json()).then(d => {
+                if (d.status === 'logged_in') {
+                    loadProfile(); // loads user profile and shows dashboard/pass
+                }
+            }).catch(() => {});
+
+            // Preload ingredients for editor validation/suggestions
+            fetchIngredients();
+        });
+
     </script>
 </body>
 </html>

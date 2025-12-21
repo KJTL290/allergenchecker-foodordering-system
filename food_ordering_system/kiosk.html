@@ -82,19 +82,7 @@
 </head>
 <body>
     
-    <div id="login-lock-screen">
-        <div class="login-box">
-            <h1 style="margin:0 0 20px 0;">🍔 Kiosk Mode</h1>
-            <p style="color:#777; margin-bottom:20px;">Staff Login Required</p>
-            <div class="error-msg" id="loginError">Invalid Credentials</div>
-            <input type="text" id="k_user" class="login-input" placeholder="Username">
-            <div class="password-wrap">
-                <input type="password" id="k_pass" class="login-input" placeholder="Password">
-                <button class="toggle-btn" onclick="togglePass('k_pass')">🔍</button>
-            </div>
-            <button class="login-btn" onclick="performKioskLogin()">Unlock Kiosk</button>
-        </div>
-    </div>
+    <!-- Login is handled centrally via index.html — kiosk will redirect to the unified login if not authenticated -->
 
     <div class="kiosk-wrapper">
         <aside class="sidebar" id="sidebar-container"></aside>
@@ -154,25 +142,29 @@
             x.type = x.type === "password" ? "text" : "password";
         }
 
-        document.getElementById('k_pass').addEventListener('keypress', function (e) { if (e.key === 'Enter') performKioskLogin(); });
-        function performKioskLogin() {
-            const u = document.getElementById('k_user').value; const p = document.getElementById('k_pass').value;
-            fetch('auth.php?action=login', { method: 'POST', body: JSON.stringify({ username: u, password: p, app: 'kiosk' }) })
-            .then(res => res.json()).then(data => { if (data.status === 'success') unlockInterface(); else document.getElementById('loginError').style.display = 'block'; })
-            .catch(() => Swal.fire('Error', 'Connection Failed', 'error'));
-        }
-        function unlockInterface() { document.getElementById('login-lock-screen').style.display = 'none'; initKiosk(); }
+        const kp = document.getElementById('k_pass'); if (kp) kp.addEventListener('keypress', function (e) { if (e.key === 'Enter') { window.location.href = 'index.html?view=kiosk'; } });
+        function unlockInterface() { const el = document.getElementById('login-lock-screen'); if(el) el.style.display = 'none'; initKiosk(); }
         
-        // Auto-unlock when embedded in dashboard for cashier role
+        // Check session and either unlock kiosk or redirect to unified login
         (function(){
             const params = new URLSearchParams(window.location.search);
-            if(params.get('autoUnlock') === '1') {
-                fetch('auth.php?action=check_session&app=admin').then(res => res.json()).then(data => {
-                    if(data.status === 'logged_in' && data.role === 'cashier') {
-                        unlockInterface();
-                    }
-                }).catch(()=>{});
-            }
+            const autoUnlock = params.get('autoUnlock') === '1';
+
+            // First check kiosk-specific session
+            fetch('auth.php?action=check_session&app=kiosk').then(res => res.json()).then(data => {
+                if(data.status === 'logged_in') return unlockInterface();
+                // If autoUnlock requested (embedded from dashboard), try admin session and allow cashier role
+                if(autoUnlock) {
+                    fetch('auth.php?action=check_session&app=admin').then(res => res.json()).then(ad => {
+                        if(ad.status === 'logged_in' && (ad.role === 'cashier' || ad.role === 'kiosk')) return unlockInterface();
+                        // otherwise redirect to unified login
+                        window.location.href = 'index.html?view=kiosk';
+                    }).catch(()=>{ window.location.href = 'index.html?view=kiosk'; });
+                } else {
+                    // Not logged in — redirect to unified login page and preselect kiosk
+                    window.location.href = 'index.html?view=kiosk';
+                }
+            }).catch(()=>{ window.location.href = 'index.html?view=kiosk'; });
         })();
         
         let cart = [], currentProduct = null, products = [], categories = [], currentQty = 1, activeCategoryName = "";

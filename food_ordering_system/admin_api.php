@@ -86,6 +86,21 @@ if ($action == 'get_categories') {
     echo json_encode($cats);
 }
 
+// 5b. GET INGREDIENTS (unique list aggregated from products)
+if ($action == 'get_ingredients') {
+    // public; returns unique normalized ingredients used in products
+    $result = $conn->query("SELECT ingredients FROM products WHERE ingredients IS NOT NULL AND ingredients != ''");
+    $set = [];
+    while($row = $result->fetch_assoc()) {
+        $parts = preg_split('/[,;\/\\|]+/', $row['ingredients']);
+        foreach($parts as $p) {
+            $w = trim(strtolower($p));
+            if($w !== '') $set[$w] = true;
+        }
+    }
+    echo json_encode(array_keys($set));
+}
+
 // 6. SAVE CATEGORY
 if ($action == 'save_category') {
     if (!isAdmin()) exit;
