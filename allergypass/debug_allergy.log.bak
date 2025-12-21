@@ -1,0 +1,10 @@
+LOG CLEARED: 2025-12-21T15:30:00+00:00 — Cleared by GitHub Copilot at user request.
+Note: original entries have been removed from this file. If you want, I can archive them to `debug_allergy.log.bak` or save elsewhere before deleting permanently.
+
+2025-12-21T15:27:02+00:00 UPDATE_REQUEST id=22 name="My 2nd allergy category" keywords=["water","cocoa","powder","matcha"]
+2025-12-21T15:27:02+00:00 GET_PROD_ING_START
+2025-12-21T15:27:02+00:00 GET_PROD_ING_EXCEPTION=["Table 'allergypass_db.products' doesn't exist"]
+2025-12-21T15:27:02+00:00 FALLBACK_FETCH_FAILED url=http://localhost/food_ordering_system/admin_api.php?action=get_ingredients
+2025-12-21T15:27:02+00:00 VALIDATION_SKIPPED
+2025-12-21T15:27:02+00:00 WARNING_VALIDATION_SKIPPED
+2025-12-21T15:27:02+00:00 SHUTDOWN_ERROR type=2 file=C:\xampp\htdocs\food_ordering_system_with_allergy_checker\allergypass\api.php line=398 message=file_get_contents(http://localhost/food_ordering_system/admin_api.php?action=get_ingredients): Failed to open stream: HTTP request failed! HTTP/1.1 404 Not Found
