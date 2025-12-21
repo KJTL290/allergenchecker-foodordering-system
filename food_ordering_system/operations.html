@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operations - Kitchen</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
+        .navbar { background:#333; color:#fff; padding:10px 15px; display:flex; align-items:center; justify-content:space-between; }
+        .kanban { display:flex; gap:15px; padding:15px; }
+        .kanban-col { background:white; border-radius:8px; padding:10px; flex:1; min-height:60vh; }
+        .order-card { background:white; border:1px solid #eee; padding:10px; border-left:5px solid #999; margin-bottom:10px; }
+        .card-actions { display:flex; gap:8px; margin-top:8px; }
+        .btn { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; color:white; font-weight:700; }
+        .btn-cook { background:#2196f3; }
+        .btn-ready { background:#4caf50; }
+        .btn-complete { background:#333; }
+        .btn-cancel { background:#f44336; }
+        .top { padding:15px; display:flex; gap:10px; align-items:center; }
+        #unpaid-list { display:flex; gap:10px; overflow-x:auto; padding:10px; }
+        .login-box { width:100%; max-width:420px; margin: auto; background:white; padding:30px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+<div id="login-lock-screen" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); z-index:10000;">
+    <div class="login-box">
+        <h2>Kitchen Login</h2>
+        <p style="color:#666; margin-bottom:12px;">Kitchen staff only</p>
+        <div style="margin-bottom:10px;"><input type="text" id="k_user_ops" placeholder="Username" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
+        <div style="margin-bottom:10px;"><input type="password" id="k_pass_ops" placeholder="Password" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;"></div>
+        <div style="display:flex; gap:10px;">
+            <button onclick="performOpsLogin()" style="flex:1; padding:10px; border-radius:6px; background:#2196f3; color:white; border:none;">Sign In</button>
+        </div>
+        <div id="opsError" style="color:red; display:none; margin-top:10px;">Invalid Credentials</div>
+    </div>
+</div>
+
+<nav class="navbar"><div>🍽️ <strong>Operations - Kitchen</strong></div><div><button onclick="logout()" style="background:#c62828; color:white; border:none; padding:8px 12px; border-radius:6px;">Logout</button></div></nav>
+
+<div class="top">
+    <div><strong>Incoming</strong> <span id="unpaid-count" style="background:#2196f3; color:white; padding:3px 8px; border-radius:8px; margin-left:8px;">0</span></div>
+    <div style="margin-left:auto;"><button onclick="openStockModal()" style="padding:8px 12px; border-radius:6px; background:#4caf50; color:white; border:none;">Manage Stock</button></div>
+</div>
+
+<div id="unpaid-area" style="padding:15px;"></div>
+
+<div class="kanban" id="kanban-area">
+    <div class="kanban-col" id="pending-col"><div style="font-weight:800; margin-bottom:8px;">Pending</div><div id="pending-list"></div></div>
+    <div class="kanban-col" id="preparing-col"><div style="font-weight:800; margin-bottom:8px;">Preparing</div><div id="preparing-list"></div></div>
+    <div class="kanban-col" id="ready-col"><div style="font-weight:800; margin-bottom:8px;">Ready</div><div id="ready-list"></div></div>
+</div>
+
+<div id="stockModal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.5);">
+  <div style="background:white; padding:20px; border-radius:8px; width:90%; max-width:480px;">
+    <h3>Manage Stock</h3>
+    <div id="stock-list-container" style="max-height:60vh; overflow:auto;"></div>
+    <div style="text-align:right; margin-top:12px;"><button onclick="document.getElementById('stockModal').style.display='none'" style="padding:8px 12px;">Close</button></div>
+  </div>
+</div>
+
+<script>
+function performOpsLogin(){
+    const u=document.getElementById('k_user_ops').value; const p=document.getElementById('k_pass_ops').value;
+    fetch('auth.php?action=login', { method:'POST', body: JSON.stringify({ username: u, password: p, app: 'operations' }) })
+    .then(res=>res.json()).then(data=>{ if(data.status==='success'){ document.getElementById('login-lock-screen').style.display='none'; initOps(); } else { document.getElementById('opsError').style.display='block'; } }).catch(()=>{ Swal.fire('Error','Connection failed','error'); });
+}
+
+function logout(){ fetch('auth.php?action=logout&app=operations').then(()=>{ location.href='operations.html'; }); }
+
+let orders = [];
+function initOps(){ fetchOrders(); setInterval(fetchOrders,2000); }
+
+function fetchOrders(){ fetch('api.php?action=get_orders').then(res=>res.json()).then(data=>{ renderOrders(data); }); }
+
+function renderOrders(ordersList){ document.getElementById('pending-list').innerHTML=''; document.getElementById('preparing-list').innerHTML=''; document.getElementById('ready-list').innerHTML=''; document.getElementById('unpaid-area').innerHTML=''; let unpaidCount=0; ordersList.forEach(o=>{ const card=document.createElement('div'); card.className='order-card'; let itemsHtml=o.items.map(i=>`<div>${i.qty}x ${i.name} • ₱${(i.price||0).toFixed(2)}</div>`).join(''); let btns=''; if(o.status==='unpaid'){ btns=`<div class="card-actions"><button class="btn btn-cancel" onclick="updateStatus(${o.id}, 'cancelled')">Cancel</button><button class="btn btn-cook" onclick="updateStatus(${o.id}, 'pending')">Accept</button></div>`; unpaidCount++; const container=document.createElement('div'); container.appendChild(card); card.innerHTML=`<div style="font-weight:700;">#${o.id}</div><div style="font-size:0.9rem;color:#555;">${itemsHtml}</div>${btns}`; document.getElementById('unpaid-area').appendChild(card); } else if(o.status==='pending'){ btns=`<div class="card-actions"><button class="btn btn-cook" onclick="updateStatus(${o.id}, 'preparing')">Cook</button></div>`; card.innerHTML=`<div style="font-weight:700;">#${o.id}</div><div style="font-size:0.9rem;color:#555;">${itemsHtml}</div>${btns}`; document.getElementById('pending-list').appendChild(card); } else if(o.status==='preparing'){ btns=`<div class="card-actions"><button class="btn btn-ready" onclick="updateStatus(${o.id}, 'ready')">Ready</button></div>`; card.innerHTML=`<div style="font-weight:700;">#${o.id}</div><div style="font-size:0.9rem;color:#555;">${itemsHtml}</div>${btns}`; document.getElementById('preparing-list').appendChild(card); } else if(o.status==='ready'){ btns=`<div class="card-actions"><button class="btn btn-complete" onclick="updateStatus(${o.id}, 'completed')">Done</button></div>`; card.innerHTML=`<div style="font-weight:700;">#${o.id}</div><div style="font-size:0.9rem;color:#555;">${itemsHtml}</div>${btns}`; document.getElementById('ready-list').appendChild(card); } }); document.getElementById('unpaid-count').innerText=unpaidCount; }
+
+function updateStatus(id, status){ fetch('api.php?action=update_status', { method:'POST', body: JSON.stringify({ id: id, status: status }) }).then(()=>fetchOrders()); }
+
+function openStockModal(){ document.getElementById('stockModal').style.display='flex'; fetch('admin_api.php?action=get_all').then(res=>res.json()).then(data=>{ const list=document.getElementById('stock-list-container'); list.innerHTML=''; data.forEach(p=>{ const btnText = p.is_available==1? 'IN STOCK' : 'OUT'; const btnColor = p.is_available==1 ? '#4caf50' : '#f44336'; list.innerHTML += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><div><b>${p.name}</b><div style="font-size:0.9rem;color:#777;">(${p.category})</div></div><button onclick="toggleQuickStock(this, ${p.id}, ${p.is_available})" style="background:${btnColor};color:white;border:none;padding:6px;border-radius:6px;">${btnText}</button></div>`; }); }); }
+function toggleQuickStock(btn, id, currentStatus){ const newStatus = currentStatus==1?0:1; const fd = new FormData(); fd.append('id', id); fd.append('status', newStatus); fetch('admin_api.php?action=toggle_stock', { method:'POST', body: fd }).then(()=>{ btn.style.background = newStatus==1? '#4caf50' : '#f44336'; btn.innerText = newStatus==1? 'IN STOCK' : 'OUT'; btn.onclick = function(){ toggleQuickStock(btn, id, newStatus); }; }); }
+
+// Check session on load
+fetch('auth.php?action=check_session&app=operations').then(res=>res.json()).then(data=>{ if(data.status === 'logged_in') { document.getElementById('login-lock-screen').style.display='none'; initOps(); } else { document.getElementById('login-lock-screen').style.display='flex'; } }).catch(()=>{ document.getElementById('login-lock-screen').style.display='flex'; });
+
+</script>
+</body>
+</html>

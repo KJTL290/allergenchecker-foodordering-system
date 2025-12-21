@@ -1,0 +1,14 @@
+- The user types should be specific
+- In all orders, the prices of the food should be visible
+- Add a kitchen staff user role
+- Kitchen Staff can see Pending, Preparing, and Ready of food order
+- During confirming of the order, add a quantity button to increase the number of foods
+- remove the Operations Tab of Admin
+- Add a line graph that can see where the sales are up and down
+- Implement a "Forget Password?" feature
+- what if the person will type in another language "isda" and english is displayed "fish"? Find a solution for this language barrier thing
+- Kitchen Staff will notify if there are no available ingredients of that specific food
+
+
+Bugs: 
+- when pressing Cancel Order,  all the following orders will be gone on the UI but it is still on the database
