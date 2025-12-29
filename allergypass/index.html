@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AllergyPass - My Account</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #f0f2f5; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+
+        .card { background: white; width: 100%; max-width: 400px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; min-height: 600px; }
+        .header { background: #c62828; color: white; padding: 25px; text-align: center; }
+        .header h1 { margin: 0; font-size: 1.5rem; }
+        
+        .body { padding: 25px; flex: 1; display: none; flex-direction: column; gap: 15px; animation: fadeIn 0.3s; }
+        .body.active { display: flex; }
+
+        /* INPUTS & BUTTONS */
+        input { width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 10px; font-size: 1rem; outline: none; }
+        input:focus { border-color: #c62828; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; transition: 0.2s; }
+        .btn-primary { background: #c62828; color: white; }
+        .btn-primary:disabled { background: #cccccc; cursor: not-allowed; }
+        .btn-secondary { background: #eee; color: #333; }
+        .btn-outline { background: white; border: 2px solid #eee; color: #555; margin-top: 5px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-outline:hover { background: #f9f9f9; border-color: #ddd; }
+        .btn-danger { background: white; border: 1px solid #c62828; color: #c62828; margin-top: 30px; font-size: 0.8rem; }
+        .link { text-align: center; color: #c62828; cursor: pointer; font-size: 0.9rem; margin-top: 10px; display: block; }
+
+        /* PASSWORD TOGGLE */
+        .password-wrap { position: relative; width: 100%; }
+        .password-wrap input { padding-right: 45px; }
+        .toggle-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; font-size: 1.2rem; opacity: 0.6; padding: 0;
+        }
+        .toggle-btn:hover { opacity: 1; }
+
+        /* BUTTON CLICK ANIMATION */
+        .btn-clicked {
+            animation: btnClickAnimation 0.3s ease;
+        }
+
+        @keyframes btnClickAnimation {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+
+        /* UNIFIED GRID SYSTEM */
+        .section-label { font-weight: 700; color: #555; font-size: 0.9rem; margin-bottom: 5px; display: block; }
+        .allergen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        
+        .allergen-btn { 
+            background: #fafafa; border: 2px solid #eee; padding: 12px; border-radius: 10px; 
+            text-align: center; font-weight: 600; cursor: pointer; color: #777; transition: 0.1s; 
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .allergen-btn.active { background: #ffebee; border-color: #c62828; color: #c62828; }
+        
+        /* Custom buttons */
+        .allergen-btn.custom-active { background: #ffebee; border-color: #c62828; color: #c62828; cursor: default; }
+
+        /* EDITOR LIST */
+        .editor-list { display: flex; flex-direction: column; gap: 10px; }
+        .editor-item { background: white; border: 1px solid #eee; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .editor-info div { font-weight: bold; color: #333; }
+        .editor-info small { color: #888; font-size: 0.8rem; }
+        .editor-actions button { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px; }
+
+        /* MODAL */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 200; }
+        .modal { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 350px; text-align: center; }
+        
+        .chip-input-group { display: flex; gap: 5px; margin-bottom: 10px; }
+        .chip-input-group input { margin: 0; }
+        .btn-add-chip { width: auto; margin: 0; background: #333; color: white; border-radius: 8px; border:none; cursor: pointer; font-weight: bold; padding: 0 15px;}
+        .chip-container { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; min-height: 30px; }
+        .chip { background: #eee; padding: 4px 8px; border-radius: 15px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
+        .chip span { cursor: pointer; font-weight: bold; color: #c62828; }
+
+        /* QR DISPLAY */
+        .qr-container { background: white; padding: 20px; border-radius: 15px; border: 2px dashed #ddd; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 250px; justify-content: center; }
+        #qrcode { margin: 10px 0; }
+        #qrcode img { display: block; margin: 0 auto; border: 5px solid white; }
+        .status-badge { background: #ffebee; color: #c62828; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; display: inline-block; margin-bottom: 10px; }
+
+        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="header">
+            <h1>🛡️ AllergyPass</h1>
+            <p>Digital Safety ID</p>
+        </div>
+
+        <div id="view-login" class="body active">
+            <h3 style="text-align:center;">Welcome Back</h3>
+            <input type="text" id="l_user" placeholder="Username">
+            <div class="password-wrap">
+                <input type="password" id="l_pass" placeholder="Password">
+                <button class="toggle-btn" onclick="togglePass('l_pass')">🔍</button>
+            </div>
+            <button class="btn btn-primary" onclick="login()">Sign In</button>
+            <span class="link" onclick="switchView('forgot')">Forgot Password?</span>
+            <span class="link" onclick="switchView('register')">New User? Create Account</span>
+        </div>
+
+        <div id="view-register" class="body">
+            <h3 style="text-align:center;">Create Account</h3>
+            <input type="text" id="r_name" placeholder="Full Name">
+            <input type="text" id="r_user" placeholder="Username">
+            <input type="email" id="r_email" placeholder="Email Address">
+            <div class="password-wrap">
+                <input type="password" id="r_pass" placeholder="Password">
+                <button class="toggle-btn" onclick="togglePass('r_pass')">🔍</button>
+            </div>
+            <button class="btn btn-primary" onclick="register()">Create Account</button>
+            <span class="link" onclick="switchView('login')">Back to Login</span>
+        </div>
+
+        <div id="view-forgot" class="body">
+            <h3 style="text-align:center;">Recover Your Account</h3>
+            <p style="text-align:center; color:#666; font-size:0.9rem; margin:5px 0 15px;">Enter your email to receive your password</p>
+            <input type="email" id="f_email" placeholder="Email Address">
+            <button class="btn btn-primary" onclick="recoverPassword()">Send Password</button>
+            <span class="link" onclick="switchView('login')">Back to Login</span>
+        </div>
+
+        <div id="view-dashboard" class="body">
+            <h3 style="margin-top:0;">My Medical Profile</h3>
+            
+            <div>
+                <span class="section-label">Common Allergens</span>
+                <div class="allergen-grid" id="commonGrid">Loading...</div>
+            </div>
+
+            <div>
+                <span class="section-label">Custom Allergies</span>
+                <div class="allergen-grid" id="customGrid">
+                    </div>
+                <button class="btn btn-outline" onclick="switchView('editor')">⚙️ Manage Custom Allergies</button>
+            </div>
+
+            <button class="btn btn-primary" onclick="saveProfile()">Save & Generate Pass</button>
+            <button class="btn btn-secondary" onclick="logout()">Logout</button>
+            <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+        </div>
+
+        <div id="view-editor" class="body">
+            <h3>Manage Allergies</h3>
+            <p style="color:#666; font-size:0.9rem; margin-top:0;">Add, Edit, or Remove your custom definitions.</p>
+            
+            <div id="editorList" class="editor-list"></div>
+
+            <button class="btn btn-primary" onclick="openModal()">+ Add New Category</button>
+            <button class="btn btn-secondary" onclick="switchView('dashboard')">Back to Profile</button>
+        </div>
+
+        <div id="view-pass" class="body">
+            <div class="qr-container">
+                <div class="status-badge">MEDICAL ALERT</div>
+                <h2 id="passName" style="margin:5px 0;">Name</h2>
+                <div id="qrcode"></div>
+                <p id="passList" style="font-size:0.85rem; color:#666; margin-top:10px;">Checking...</p>
+                <div id="customPassDetails" style="font-size:0.8rem; color:#888; margin-top:5px; font-style:italic;"></div>
+            </div>
+            <button class="btn btn-primary" onclick="downloadQR()">⬇ Download Image</button>
+            <button class="btn btn-secondary" onclick="switchView('dashboard')">Edit Profile</button>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editorModal">
+        <div class="modal">
+            <h3 id="modalHeader">Custom Allergy</h3>
+            <input type="hidden" id="edit_id">
+            <input type="text" id="c_name" placeholder="Category Name (e.g. Nightshades)">
+            <div class="chip-input-group">
+                <input type="text" id="c_word" placeholder="Ingredient (e.g. Tomato)">
+                <button class="btn-add-chip" onclick="addChip()">Add</button>
+            </div>
+            <div style="font-size:0.85rem; color:#666; text-align:left; margin-bottom:8px;">Only ingredients used in menu items can be added here to prevents free-text entries.</div>
+            <div class="chip-container" id="chipList"></div>
+            <button class="btn btn-primary" onclick="submitCustomAllergy()">Save Category</button>
+            <button class="btn btn-secondary" style="margin-top:5px;" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let commonAllergens = [];
+        let activeAllergies = new Set();
+        let customAllergens = [];
+        let currentUser = {};
+        let tempKeywords = [];
+        let allIngredients = []; // normalized list of available product ingredients (fetched)
+
+        // Fetch aggregated ingredient list from food ordering system
+        function fetchIngredients() {
+            fetch('../food_ordering_system/admin_api.php?action=get_ingredients')
+            .then(res => res.json())
+            .then(data => { allIngredients = data || []; })
+            .catch(() => { allIngredients = []; });
+        }
+
+        function togglePass(id) {
+            const x = document.getElementById(id);
+            x.type = x.type === "password" ? "text" : "password";
+        }
+
+        // --- AUTH ---
+        function register() {
+            const name = document.getElementById('r_name').value;
+            const user = document.getElementById('r_user').value;
+            const email = document.getElementById('r_email').value;
+            const pass = document.getElementById('r_pass').value;
+            if(!name || !user || !email || !pass) return Swal.fire('Error', 'Fill all fields', 'error');
+            fetch('api.php?action=register', { method: 'POST', body: JSON.stringify({username:user, password:pass, full_name:name, email:email}) })
+            .then(res=>res.json()).then(d => {
+                if(d.status === 'success') {
+                    Swal.fire('Success', 'Account Created!', 'success').then(() => loadProfile());
+                } else { Swal.fire('Error', d.message, 'error'); }
+            });
+        }
+        function login() {
+            const user = document.getElementById('l_user').value;
+            const pass = document.getElementById('l_pass').value;
+            fetch('api.php?action=login', { method: 'POST', body: JSON.stringify({username:user, password:pass}) })
+            .then(res=>res.json()).then(d => { 
+                if(d.status === 'success') loadProfile(); 
+                else Swal.fire('Login Failed', d.message, 'error'); 
+            });
+        }
+        function logout() { fetch('api.php?action=logout').then(() => location.reload()); }
+        function deleteAccount() {
+            Swal.fire({title: 'Are you sure?', text: "You won't be able to revert this!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#c62828', confirmButtonText: 'Yes, delete it!'})
+            .then((result) => { if (result.isConfirmed) fetch('api.php?action=delete_account').then(() => location.reload()); });
+        }
+
+        function recoverPassword() {
+            const email = document.getElementById('f_email').value;
+            const button = document.querySelector('#view-forgot .btn-primary');
+            if(!email) return Swal.fire('Error', 'Please enter your email address', 'error');
+
+            // Add animation class to button to indicate click
+            button.classList.add('btn-clicked');
+
+            // Remove the animation class after animation completes
+            setTimeout(() => {
+                button.classList.remove('btn-clicked');
+            }, 300);
+
+            // Disable button and show loading state
+            button.disabled = true;
+            const originalText = button.textContent;
+            button.textContent = 'Sending...';
+
+            fetch('api.php?action=recover_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    Swal.fire('Success', data.message, 'success');
+                    switchView('login');
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                Swal.fire('Error', 'An error occurred while sending the email. Please try again.', 'error');
+            })
+            .finally(() => {
+                // Restore button state
+                button.disabled = false;
+                button.textContent = originalText;
+            });
+        }
+
+        // --- DATA & UI ---
+        async function loadProfile(targetView = null) {
+            const resCommon = await fetch('api.php?action=get_common_allergens');
+            commonAllergens = await resCommon.json();
+            const grid = document.getElementById('commonGrid');
+            grid.innerHTML = '';
+            commonAllergens.forEach(alg => {
+                grid.innerHTML += `<div class="allergen-btn" id="btn-${alg.name}" onclick="toggleCommon('${alg.name}')">${alg.icon} ${alg.name}</div>`;
+            });
+
+            // Fetch product ingredients for client-side validation
+            fetchIngredients();
+
+            fetch('api.php?action=get_profile').then(res=>res.json()).then(d => {
+                if(d.status === 'success') {
+                    currentUser = d;
+                    activeAllergies = new Set(d.allergies);
+                    customAllergens = d.custom_allergies;
+                    renderCustomGrid(); updateEditorList(); updateUI();
+                    if (targetView) switchView(targetView);
+                    else {
+                        if(d.allergies.length > 0 || d.custom_allergies.length > 0) renderPass();
+                        else switchView('dashboard');
+                    }
+                }
+            });
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.allergen-btn').forEach(btn => btn.classList.remove('active'));
+            activeAllergies.forEach(alg => {
+                const btn = document.getElementById('btn-' + alg);
+                if(btn) btn.classList.add('active');
+            });
+        }
+
+        function renderCustomGrid() {
+            const grid = document.getElementById('customGrid');
+            grid.innerHTML = customAllergens.length ? '' : '<span style="color:#aaa; font-size:0.9rem;">None.</span>';
+            customAllergens.forEach(c => { grid.innerHTML += `<div class="allergen-btn custom-active">⚠️ ${c.name}</div>`; });
+        }
+
+        function updateEditorList() {
+            const list = document.getElementById('editorList');
+            list.innerHTML = customAllergens.length ? '' : '<span style="text-align:center; color:#999;">No custom categories found.</span>';
+            customAllergens.forEach(c => {
+                list.innerHTML += `
+                    <div class="editor-item">
+                        <div class="editor-info"><div>${c.name}</div><small>${c.keywords.join(', ')}</small></div>
+                        <div class="editor-actions"><button onclick="openModal(${c.id})">✏️</button><button onclick="deleteCustom(${c.id})" style="color:#e57373;">🗑️</button></div>
+                    </div>`;
+            });
+        }
+
+        function toggleCommon(name) {
+            if (activeAllergies.has(name)) activeAllergies.delete(name); else activeAllergies.add(name);
+            updateUI();
+        }
+
+        function saveProfile() {
+            const list = Array.from(activeAllergies);
+            fetch('api.php?action=save_profile', { method: 'POST', body: JSON.stringify({allergies: list}) })
+            .then(() => { 
+                currentUser.allergies = list; 
+                Swal.fire({icon: 'success', title: 'Profile Saved', showConfirmButton: false, timer: 1500}).then(() => renderPass());
+            });
+        }
+
+        // --- EDITOR LOGIC ---
+        function openModal(editId = null) {
+            document.getElementById('editorModal').style.display = 'flex';
+            document.getElementById('c_word').value = '';
+            if(editId) {
+                const item = customAllergens.find(c => c.id == editId);
+                document.getElementById('modalHeader').innerText = "Edit Category";
+                document.getElementById('edit_id').value = item.id;
+                document.getElementById('c_name').value = item.name;
+                tempKeywords = [...item.keywords];
+            } else {
+                document.getElementById('modalHeader').innerText = "New Category";
+                document.getElementById('edit_id').value = "";
+                document.getElementById('c_name').value = '';
+                tempKeywords = [];
+            }
+            renderChips();
+        }
+
+        function closeModal() { document.getElementById('editorModal').style.display = 'none'; }
+        function addChip() {
+            const val = document.getElementById('c_word').value.trim();
+            if(!val) return;
+            // If no product ingredients are loaded, allow adding but warn the user that validation may be skipped
+            if(!allIngredients || allIngredients.length === 0) {
+                tempKeywords.push(val); renderChips(); document.getElementById('c_word').value = '';
+                return Swal.fire({icon:'info', title:'Note', text:'Product ingredients are unavailable – validation may be skipped on save.', showConfirmButton:false, timer:1500});
+            }
+            const lk = val.toLowerCase();
+            // allow if any ingredient contains the keyword or vice versa
+            const ok = allIngredients.some(a => { a = a.toLowerCase(); return a.indexOf(lk) !== -1 || lk.indexOf(a) !== -1; });
+            if(!ok) { return Swal.fire('Invalid', `"${val}" is not found in product ingredients in the menu, so no need to worry if you're allergic to that.`, 'warning'); }
+            tempKeywords.push(val); renderChips(); document.getElementById('c_word').value = '';
+        }
+        function removeChip(index) { tempKeywords.splice(index, 1); renderChips(); }
+        function renderChips() {
+            const div = document.getElementById('chipList');
+            div.innerHTML = tempKeywords.map((k, i) => `<div class="chip">${k} <span onclick="removeChip(${i})">×</span></div>`).join('');
+        }
+
+        function submitCustomAllergy() {
+            const idVal = document.getElementById('edit_id').value;
+            const name = document.getElementById('c_name').value;
+            if(!name || tempKeywords.length === 0) return Swal.fire('Warning', 'Please add name and ingredients', 'warning');
+
+            const doSubmit = () => {
+                // client-side strict validation (only when product ingredients are available)
+                if(allIngredients && allIngredients.length > 0) {
+                    const invalid = [];
+                    tempKeywords.forEach(k => { const lk = k.toLowerCase().trim(); if(lk === '') return; const ok = allIngredients.some(a => { a = a.toLowerCase(); return a.indexOf(lk) !== -1 || lk.indexOf(a) !== -1; }); if(!ok) invalid.push(k); });
+                    if(invalid.length > 0) return Swal.fire('Error', 'Invalid ingredient(s): ' + invalid.join(', '), 'error');
+                }
+
+                const action = (idVal && idVal !== "") ? 'update_custom_allergy' : 'add_custom_allergy';
+                const body = { name: name, keywords: tempKeywords };
+                if(idVal) body.id = idVal;
+                fetch('api.php?action='+action, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
+                .then(res => res.text())
+                .then(text => {
+                    let r = {};
+                    try { r = JSON.parse(text); } catch(e) { console.error('Non-JSON response:', text); // show raw response for debugging
+                        const short = (text||'').slice(0,1500);
+                        Swal.fire({icon:'error', title:'Save failed', html: '<div style="text-align:left; max-height:200px; overflow:auto; white-space:pre-wrap;">'+escapeHtml(short)+'</div><br><small>Fetching server debug log...</small>'});
+                        // attempt to fetch server-side debug log
+                        fetch('api.php?action=get_debug_log').then(r=>r.json()).then(d=>{ if(d.status==='success') console.log('DEBUG LOG', d.lines); else console.log('No debug log'); }).catch(()=>{});
+                        return; }
+                    console.log('ADD_CUSTOM_RESPONSE', r);
+                if(r.status === 'success') { closeModal(); loadProfile('editor'); Swal.fire({icon: 'success', title: 'Saved', showConfirmButton: false, timer: 1000}); }
+                    else Swal.fire('Error', r.message || ('Save failed: ' + (text || 'no details')), 'error');
+                })
+                .catch(err => { console.error('Fetch error', err); Swal.fire('Error', 'Save failed: network error', 'error'); });
+            };
+
+            if(!allIngredients || allIngredients.length === 0) {
+                Swal.fire({title:'No product ingredients', text:'Ingredient validation is unavailable — saving will skip strict validation. Do you want to continue?', icon:'warning', showCancelButton:true, confirmButtonText:'Yes, save anyway'}).then(r=>{ if(r.isConfirmed) doSubmit(); });
+                return;
+            }
+
+            // otherwise proceed normally
+            doSubmit();
+        }
+
+        // small helper to safely escape HTML when injecting into Swal
+        function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+        function deleteCustom(id) {
+            Swal.fire({title: 'Delete this rule?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete it!'})
+            .then((result) => { if (result.isConfirmed) fetch('api.php?action=delete_custom_allergy', { method: 'POST', body: JSON.stringify({id: id}) }).then(() => loadProfile('editor')); });
+        }
+
+        // --- QR RENDER ---
+        function renderPass() {
+            switchView('pass');
+            document.getElementById('passName').innerText = currentUser.name;
+            const commonStr = currentUser.allergies.join(", ");
+            const customStr = customAllergens.map(c => `${c.name} (${c.keywords.join(',')})`).join("; ");
+            document.getElementById('passList').innerText = "Allergies: " + (commonStr || "None");
+            document.getElementById('customPassDetails').innerText = customStr ? "Specific: " + customStr : "";
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = "";
+            const qrData = { name: currentUser.name, allergies: currentUser.allergies, custom: customAllergens.map(c => ({name: c.name, keywords: c.keywords})) };
+            // Generate QR immediately and ensure any previous QR is removed to avoid duplicates
+            try {
+                new QRCode(qrContainer, { text: JSON.stringify(qrData), width: 180, height: 180, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.M });
+            } catch (e) {
+                console.error('QR generation failed', e);
+            }
+        }
+
+        function downloadQR() {
+            let qrElement = document.querySelector("#qrcode canvas"); 
+            if (!qrElement) qrElement = document.querySelector("#qrcode img");
+            if (!qrElement) { Swal.fire('Info', 'QR Code not generated yet.', 'info'); return; }
+            const PADDING = 30; 
+            const qrSize = qrElement.width || qrElement.naturalWidth;
+            const newSize = qrSize + 2 * PADDING;
+            const paddedCanvas = document.createElement('canvas');
+            paddedCanvas.width = newSize; paddedCanvas.height = newSize;
+            const ctx = paddedCanvas.getContext('2d');
+            ctx.fillStyle = 'white'; ctx.fillRect(0, 0, newSize, newSize);
+            ctx.drawImage(qrElement, PADDING, PADDING, qrSize, qrSize);
+            const dataURL = paddedCanvas.toDataURL("image/png");
+            const link = document.createElement("a");
+            link.href = dataURL; link.download = "My_AllergyPass.png";
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function switchView(viewName) {
+            document.querySelectorAll('.body').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + viewName).classList.add('active');
+        }
+
+        // On page load: check if user session exists and fetch ingredient list early
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('api.php?action=check_session').then(res => res.json()).then(d => {
+                if (d.status === 'logged_in') {
+                    loadProfile(); // loads user profile and shows dashboard/pass
+                }
+            }).catch(() => {});
+
+            // Preload ingredients for editor validation/suggestions
+            fetchIngredients();
+        });
+
+    </script>
+</body>
+</html>
